@@ -1,0 +1,18 @@
+{
+  "name": "alpha-tuition-system",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "install:all": "npm install --workspaces",
+    "dev": "npm run dev --workspaces",
+    "start": "npm run start --workspaces",
+    "build": "npm run build --workspaces"
+  },
+  "devDependencies": {
+    "vite": "^8.0.14"
+  }
+}

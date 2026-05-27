@@ -1,0 +1,14 @@
+How to run
+
+# Start backend
+npm run --workspace=backend dev
+
+# In another terminal, start frontend
+npm run --workspace=frontend dev
+
+
+Sample users
+
+admin@alpha.local
+tutor@alpha.local
+student@alpha.local
