@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-function DashboardPage({ token, user, onLogout }) {
+function DashboardPage({ token, user }) {
   const [students, setStudents] = useState([]);
   const [classes, setClasses] = useState([]);
   const [subjects, setSubjects] = useState([]);
@@ -45,18 +45,12 @@ function DashboardPage({ token, user, onLogout }) {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
       <header className="border-b border-slate-800 bg-slate-900/90 px-6 py-5 backdrop-blur-sm">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4">
+        <div className="flex items-center justify-between gap-4">
           <div>
             <p className="text-sm text-slate-400">Welcome back,</p>
             <h1 className="text-2xl font-semibold">{user?.name || 'Tutor'}</h1>
           </div>
-          <button
-            type="button"
-            onClick={onLogout}
-            className="rounded-2xl bg-slate-700 px-4 py-2 text-sm text-slate-100 transition hover:bg-slate-600"
-          >
-            Logout
-          </button>
+          <p className="text-sm text-slate-400">{user?.role?.toUpperCase()}</p>
         </div>
       </header>
 
@@ -80,8 +74,8 @@ function DashboardPage({ token, user, onLogout }) {
           <div className="rounded-3xl border border-slate-800 bg-slate-900 p-6 shadow-xl shadow-slate-900/30">
             <div className="mb-4 flex items-center justify-between gap-4">
               <div>
-                <h2 className="text-lg font-semibold">Students</h2>
-                <p className="text-sm text-slate-500">Recent student records</p>
+                <h2 className="text-lg font-semibold">Recent students</h2>
+                <p className="text-sm text-slate-500">Latest student records</p>
               </div>
             </div>
             {loading ? (

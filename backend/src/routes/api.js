@@ -3,6 +3,10 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const pool = require('../db');
 const { authenticate } = require('../middleware/auth');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+const PDFDocument = require('pdfkit');
 
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'change-me';
@@ -169,11 +173,11 @@ router.post('/students', authenticate, async (req, res) => {
 
 router.put('/students/:id', authenticate, async (req, res) => {
   const { id } = req.params;
-  const { full_name, gender, dob, mobile, parent_name, parent_contact, address, email, admission_date, class_id, section, status } = req.body;
+  const { full_name, gender, dob, mobile, parent_name, parent_contact, address, email, admission_date, class_id, section } = req.body;
   try {
     await pool.query(
-      'UPDATE students SET full_name = ?, gender = ?, dob = ?, mobile = ?, parent_name = ?, parent_contact = ?, address = ?, email = ?, admission_date = ?, class_id = ?, section = ?, status = ? WHERE id = ?',
-      [full_name, gender, dob, mobile, parent_name, parent_contact, address, email, admission_date, class_id, section, status, id]
+      'UPDATE students SET full_name = ?, gender = ?, dob = ?, mobile = ?, parent_name = ?, parent_contact = ?, address = ?, email = ?, admission_date = ?, class_id = ?, section = ? WHERE id = ?',
+      [full_name, gender, dob, mobile, parent_name, parent_contact, address, email, admission_date, class_id, section, id]
     );
     res.json({ ok: true });
   } catch (err) {
@@ -190,6 +194,437 @@ router.delete('/students/:id', authenticate, async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Unable to delete student' });
+  }
+});
+
+// Chapters CRUD
+router.get('/chapters', authenticate, async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT ch.id, ch.title, ch.chapter_number, ch.status, s.subject_name FROM chapters ch LEFT JOIN subjects s ON ch.subject_id = s.id LIMIT 200');
+    res.json({ data: rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Unable to fetch chapters' });
+  }
+});
+
+router.post('/chapters', authenticate, async (req, res) => {
+  const { subject_id, chapter_number, title, notes_path, status } = req.body;
+  if (!subject_id || !title) return res.status(400).json({ error: 'subject_id and title required' });
+  try {
+    const [result] = await pool.query('INSERT INTO chapters (subject_id, chapter_number, title, notes_path, status) VALUES (?, ?, ?, ?, ?)', [subject_id, chapter_number, title, notes_path, status || 'published']);
+    res.json({ id: result.insertId });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Unable to create chapter' });
+  }
+});
+
+router.put('/chapters/:id', authenticate, async (req, res) => {
+  const { id } = req.params;
+  const { subject_id, chapter_number, title, notes_path, status } = req.body;
+  try {
+    await pool.query('UPDATE chapters SET subject_id = ?, chapter_number = ?, title = ?, notes_path = ?, status = ? WHERE id = ?', [subject_id, chapter_number, title, notes_path, status, id]);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Unable to update chapter' });
+  }
+});
+
+router.delete('/chapters/:id', authenticate, async (req, res) => {
+  const { id } = req.params;
+  try {
+    await pool.query('DELETE FROM chapters WHERE id = ?', [id]);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Unable to delete chapter' });
+  }
+});
+
+// Tests CRUD
+router.get('/tests', authenticate, async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT t.*, c.class_name, s.subject_name, ch.title as chapter_title FROM tests t LEFT JOIN classes c ON t.class_id = c.id LEFT JOIN subjects s ON t.subject_id = s.id LEFT JOIN chapters ch ON t.chapter_id = ch.id ORDER BY t.date DESC LIMIT 200');
+    res.json({ data: rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Unable to fetch tests' });
+  }
+});
+
+router.post('/tests', authenticate, async (req, res) => {
+  const { class_id, subject_id, chapter_id, test_type, title, date, start_time, end_time, total_marks, duration_minutes, instructions } = req.body;
+  if (!class_id || !subject_id || !title || !date) return res.status(400).json({ error: 'class_id, subject_id, title and date required' });
+  try {
+    const [result] = await pool.query('INSERT INTO tests (class_id, subject_id, chapter_id, test_type, title, date, start_time, end_time, total_marks, duration_minutes, instructions) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [class_id, subject_id, chapter_id, test_type, title, date, start_time, end_time, total_marks || 100, duration_minutes || 60, instructions]);
+    res.json({ id: result.insertId });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Unable to create test' });
+  }
+});
+
+router.put('/tests/:id', authenticate, async (req, res) => {
+  const { id } = req.params;
+  const { class_id, subject_id, chapter_id, test_type, title, date, start_time, end_time, total_marks, duration_minutes, instructions } = req.body;
+  try {
+    await pool.query('UPDATE tests SET class_id = ?, subject_id = ?, chapter_id = ?, test_type = ?, title = ?, date = ?, start_time = ?, end_time = ?, total_marks = ?, duration_minutes = ?, instructions = ? WHERE id = ?', [class_id, subject_id, chapter_id, test_type, title, date, start_time, end_time, total_marks, duration_minutes, instructions, id]);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Unable to update test' });
+  }
+});
+
+router.delete('/tests/:id', authenticate, async (req, res) => {
+  const { id } = req.params;
+  try {
+    await pool.query('DELETE FROM tests WHERE id = ?', [id]);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Unable to delete test' });
+  }
+});
+
+// Questions CRUD
+router.get('/questions', authenticate, async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT q.*, s.subject_name, ch.title as chapter_title FROM questions q LEFT JOIN subjects s ON q.subject_id = s.id LEFT JOIN chapters ch ON q.chapter_id = ch.id ORDER BY q.created_at DESC LIMIT 500');
+    res.json({ data: rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Unable to fetch questions' });
+  }
+});
+
+router.post('/questions', authenticate, async (req, res) => {
+  const { subject_id, chapter_id, question_type, question_text, options, correct_answer, marks, difficulty, tags } = req.body;
+  if (!question_text) return res.status(400).json({ error: 'question_text required' });
+  try {
+    const opts = options ? (typeof options === 'string' ? options : JSON.stringify(options)) : null;
+    const [result] = await pool.query('INSERT INTO questions (subject_id, chapter_id, question_type, question_text, options, correct_answer, marks, difficulty, tags) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [subject_id, chapter_id, question_type, question_text, opts, correct_answer, marks || 1, difficulty || 'medium', tags]);
+    res.json({ id: result.insertId });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Unable to create question' });
+  }
+});
+
+router.put('/questions/:id', authenticate, async (req, res) => {
+  const { id } = req.params;
+  const { subject_id, chapter_id, question_type, question_text, options, correct_answer, marks, difficulty, tags } = req.body;
+  try {
+    const opts = options ? (typeof options === 'string' ? options : JSON.stringify(options)) : null;
+    await pool.query('UPDATE questions SET subject_id = ?, chapter_id = ?, question_type = ?, question_text = ?, options = ?, correct_answer = ?, marks = ?, difficulty = ?, tags = ? WHERE id = ?', [subject_id, chapter_id, question_type, question_text, opts, correct_answer, marks, difficulty, tags, id]);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Unable to update question' });
+  }
+});
+
+router.delete('/questions/:id', authenticate, async (req, res) => {
+  const { id } = req.params;
+  try {
+    await pool.query('DELETE FROM questions WHERE id = ?', [id]);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Unable to delete question' });
+  }
+});
+
+// Question Papers (basic)
+router.get('/question_papers', authenticate, async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT qp.*, t.title as test_title, u.full_name as generated_by_name FROM question_papers qp LEFT JOIN tests t ON qp.test_id = t.id LEFT JOIN users u ON qp.generated_by = u.id ORDER BY qp.created_at DESC LIMIT 200');
+    res.json({ data: rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Unable to fetch question papers' });
+  }
+});
+
+router.post('/question_papers', authenticate, async (req, res) => {
+  const { test_id, title, generated_by, pdf_path } = req.body;
+  if (!test_id || !title) return res.status(400).json({ error: 'test_id and title required' });
+  try {
+    const [result] = await pool.query('INSERT INTO question_papers (test_id, title, generated_by, pdf_path) VALUES (?, ?, ?, ?)', [test_id, title, generated_by || null, pdf_path || null]);
+    res.json({ id: result.insertId });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Unable to create question paper' });
+  }
+});
+
+// File upload setup
+const uploadsRoot = path.join(__dirname, '..', '..', 'uploads');
+if (!fs.existsSync(uploadsRoot)) fs.mkdirSync(uploadsRoot, { recursive: true });
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const dest = path.join(uploadsRoot, 'question_papers');
+    fs.mkdirSync(dest, { recursive: true });
+    cb(null, dest);
+  },
+  filename: function (req, file, cb) {
+    const name = Date.now() + '-' + file.originalname.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+    cb(null, name);
+  }
+});
+const upload = multer({ storage });
+
+// Upload PDF for question paper and optionally create record
+router.post('/upload/question_paper', authenticate, upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+    const relPath = path.join('uploads', 'question_papers', req.file.filename).replace(/\\/g, '/');
+    // create db record if test_id provided
+    const { test_id, title } = req.body;
+    if (test_id && title) {
+      const [r] = await pool.query('INSERT INTO question_papers (test_id, title, generated_by, pdf_path) VALUES (?, ?, ?, ?)', [test_id, title, req.user.id, relPath]);
+      return res.json({ id: r.insertId, path: relPath });
+    }
+    res.json({ path: relPath });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Upload failed' });
+  }
+});
+
+// Generate a simple PDF question paper from question ids
+router.post('/question_papers/generate', authenticate, async (req, res) => {
+  try {
+    const { test_id, title, question_ids } = req.body;
+    if (!test_id || !title || !Array.isArray(question_ids) || question_ids.length === 0) return res.status(400).json({ error: 'test_id, title and question_ids required' });
+    // fetch questions
+    const [questions] = await pool.query('SELECT id, question_text, options, marks FROM questions WHERE id IN (?)', [question_ids]);
+    // create pdf
+    const filename = `${Date.now()}-${title.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
+    const outDir = path.join(uploadsRoot, 'question_papers');
+    fs.mkdirSync(outDir, { recursive: true });
+    const outPath = path.join(outDir, filename);
+    const doc = new PDFDocument({ margin: 50 });
+    const stream = fs.createWriteStream(outPath);
+    doc.pipe(stream);
+    doc.fontSize(18).text(title, { align: 'center' });
+    doc.moveDown();
+    let idx = 1;
+    for (const q of questions) {
+      doc.fontSize(12).text(`${idx}. ${q.question_text}`);
+      if (q.options) {
+        let opts = [];
+        try { opts = JSON.parse(q.options); } catch (e) { opts = null; }
+        if (Array.isArray(opts)) {
+          let oIdx = 0;
+          for (const o of opts) {
+            const label = String.fromCharCode(65 + (oIdx % 26));
+            doc.text(`   ${label}. ${o}`);
+            oIdx++;
+          }
+        }
+      }
+      doc.moveDown();
+      idx++;
+    }
+    doc.end();
+    await new Promise((resolve) => stream.on('finish', resolve));
+    const relPath = path.join('uploads', 'question_papers', filename).replace(/\\/g, '/');
+    const [r] = await pool.query('INSERT INTO question_papers (test_id, title, generated_by, pdf_path) VALUES (?, ?, ?, ?)', [test_id, title, req.user.id, relPath]);
+    const qpId = r.insertId;
+    // insert question relations
+    const inserts = question_ids.map((qid, i) => [qpId, qid, i + 1]);
+    if (inserts.length) await pool.query('INSERT INTO question_paper_questions (question_paper_id, question_id, sequence_order) VALUES ?', [inserts]);
+    res.json({ id: qpId, path: relPath });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Unable to generate question paper' });
+  }
+});
+
+// DPQ CRUD
+router.get('/dpq', authenticate, async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT d.*, c.class_name, s.subject_name, ch.title as chapter_title FROM dpq d LEFT JOIN classes c ON d.class_id = c.id LEFT JOIN subjects s ON d.subject_id = s.id LEFT JOIN chapters ch ON d.chapter_id = ch.id ORDER BY d.publish_date DESC LIMIT 200');
+    res.json({ data: rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Unable to fetch dpq' });
+  }
+});
+
+router.post('/dpq', authenticate, async (req, res) => {
+  const { class_id, subject_id, chapter_id, title, description, publish_date, due_date, status } = req.body;
+  if (!class_id || !title || !publish_date) return res.status(400).json({ error: 'class_id, title and publish_date required' });
+  try {
+    const [result] = await pool.query('INSERT INTO dpq (class_id, subject_id, chapter_id, title, description, publish_date, due_date, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', [class_id, subject_id, chapter_id, title, description, publish_date, due_date, status || 'published']);
+    res.json({ id: result.insertId });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Unable to create dpq' });
+  }
+});
+
+router.put('/dpq/:id', authenticate, async (req, res) => {
+  const { id } = req.params;
+  const { class_id, subject_id, chapter_id, title, description, publish_date, due_date, status } = req.body;
+  try {
+    await pool.query('UPDATE dpq SET class_id = ?, subject_id = ?, chapter_id = ?, title = ?, description = ?, publish_date = ?, due_date = ?, status = ? WHERE id = ?', [class_id, subject_id, chapter_id, title, description, publish_date, due_date, status, id]);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Unable to update dpq' });
+  }
+});
+
+router.delete('/dpq/:id', authenticate, async (req, res) => {
+  const { id } = req.params;
+  try {
+    await pool.query('DELETE FROM dpq WHERE id = ?', [id]);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Unable to delete dpq' });
+  }
+});
+
+// Attendance CRUD
+router.get('/attendance', authenticate, async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT a.*, s.full_name, c.class_name FROM attendance a LEFT JOIN students s ON a.student_id = s.id LEFT JOIN classes c ON a.class_id = c.id ORDER BY a.attendance_date DESC LIMIT 500');
+    res.json({ data: rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Unable to fetch attendance' });
+  }
+});
+
+router.post('/attendance', authenticate, async (req, res) => {
+  const { student_id, class_id, attendance_date, status, remarks } = req.body;
+  if (!student_id || !class_id || !attendance_date) return res.status(400).json({ error: 'student_id, class_id and attendance_date required' });
+  try {
+    const [result] = await pool.query('INSERT INTO attendance (student_id, class_id, attendance_date, status, remarks) VALUES (?, ?, ?, ?, ?)', [student_id, class_id, attendance_date, status || 'present', remarks]);
+    res.json({ id: result.insertId });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Unable to create attendance record' });
+  }
+});
+
+router.put('/attendance/:id', authenticate, async (req, res) => {
+  const { id } = req.params;
+  const { student_id, class_id, attendance_date, status, remarks } = req.body;
+  try {
+    await pool.query('UPDATE attendance SET student_id = ?, class_id = ?, attendance_date = ?, status = ?, remarks = ? WHERE id = ?', [student_id, class_id, attendance_date, status, remarks, id]);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Unable to update attendance' });
+  }
+});
+
+router.delete('/attendance/:id', authenticate, async (req, res) => {
+  const { id } = req.params;
+  try {
+    await pool.query('DELETE FROM attendance WHERE id = ?', [id]);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Unable to delete attendance record' });
+  }
+});
+
+// Fees CRUD
+router.get('/fees', authenticate, async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT f.*, s.full_name FROM fees f LEFT JOIN students s ON f.student_id = s.id ORDER BY f.created_at DESC LIMIT 500');
+    res.json({ data: rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Unable to fetch fees' });
+  }
+});
+
+router.post('/fees', authenticate, async (req, res) => {
+  const { student_id, total_fee, paid_amount, due_amount, payment_date, payment_mode, status, remarks } = req.body;
+  if (!student_id) return res.status(400).json({ error: 'student_id required' });
+  try {
+    const [result] = await pool.query('INSERT INTO fees (student_id, total_fee, paid_amount, due_amount, payment_date, payment_mode, status, remarks) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', [student_id, total_fee || 0, paid_amount || 0, due_amount || 0, payment_date || null, payment_mode || 'cash', status || 'due', remarks]);
+    res.json({ id: result.insertId });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Unable to create fee record' });
+  }
+});
+
+router.put('/fees/:id', authenticate, async (req, res) => {
+  const { id } = req.params;
+  const { student_id, total_fee, paid_amount, due_amount, payment_date, payment_mode, status, remarks } = req.body;
+  try {
+    await pool.query('UPDATE fees SET student_id = ?, total_fee = ?, paid_amount = ?, due_amount = ?, payment_date = ?, payment_mode = ?, status = ?, remarks = ? WHERE id = ?', [student_id, total_fee, paid_amount, due_amount, payment_date, payment_mode, status, remarks, id]);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Unable to update fee record' });
+  }
+});
+
+router.delete('/fees/:id', authenticate, async (req, res) => {
+  const { id } = req.params;
+  try {
+    await pool.query('DELETE FROM fees WHERE id = ?', [id]);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Unable to delete fee record' });
+  }
+});
+
+// Notifications CRUD
+router.get('/notifications', authenticate, async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT * FROM notifications ORDER BY send_date DESC LIMIT 500');
+    res.json({ data: rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Unable to fetch notifications' });
+  }
+});
+
+router.post('/notifications', authenticate, async (req, res) => {
+  const { recipient_role, recipient_id, type, message, channel, is_read } = req.body;
+  if (!message) return res.status(400).json({ error: 'message required' });
+  try {
+    const [result] = await pool.query('INSERT INTO notifications (recipient_role, recipient_id, type, message, channel, is_read) VALUES (?, ?, ?, ?, ?, ?)', [recipient_role || 'all', recipient_id || null, type || 'general', message, channel || 'in-app', is_read ? 1 : 0]);
+    res.json({ id: result.insertId });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Unable to create notification' });
+  }
+});
+
+router.put('/notifications/:id', authenticate, async (req, res) => {
+  const { id } = req.params;
+  const { recipient_role, recipient_id, type, message, channel, is_read } = req.body;
+  try {
+    await pool.query('UPDATE notifications SET recipient_role = ?, recipient_id = ?, type = ?, message = ?, channel = ?, is_read = ? WHERE id = ?', [recipient_role, recipient_id, type, message, channel, is_read ? 1 : 0, id]);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Unable to update notification' });
+  }
+});
+
+router.delete('/notifications/:id', authenticate, async (req, res) => {
+  const { id } = req.params;
+  try {
+    await pool.query('DELETE FROM notifications WHERE id = ?', [id]);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Unable to delete notification' });
   }
 });
 
