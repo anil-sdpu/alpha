@@ -19,7 +19,7 @@ function TestsPage({ token }){
 
   async function load(){ setLoading(true); setError(''); try{ const res=await fetch('/api/tests',{headers:{Authorization:`Bearer ${token}`}}); if(!res.ok) throw new Error('Failed to load tests'); const j=await res.json(); setItems(j.data||[]); }catch(e){ setError(e.message);} finally{ setLoading(false);} }
 
-  async function loadMeta(){ try{ const r1=await fetch('/api/classes',{headers:{Authorization:`Bearer ${token}`}}); if(r1.ok){ setClasses((await r1.json()).data||[]);} const r2=await fetch('/api/subjects',{headers:{Authorization:`Bearer ${token}`}}); if(r2.ok){ setSubjects((await r2.json()).data||[]);} }catch(e){}
+  async function loadMeta(){ try{ const r1=await fetch('/api/classes',{headers:{Authorization:`Bearer ${token}`}}); if(r1.ok){ setClasses((await r1.json()).data||[]);} const r2=await fetch('/api/subjects',{headers:{Authorization:`Bearer ${token}`}}); if(r2.ok){ setSubjects((await r2.json()).data||[]);} }catch(e){} }
 
   function resetForm(){ setFormData({class_id:'',subject_id:'',chapter_id:'',test_type:'weekly',title:'',date:'',start_time:'',end_time:'',total_marks:100,duration_minutes:60}); setEditingId(null); setShow(false); }
 
@@ -76,7 +76,9 @@ function TestsPage({ token }){
                     <th className="px-6 py-3 text-left font-semibold">Class</th>
                     <th className="px-6 py-3 text-left font-semibold">Subject</th>
                     <th className="px-6 py-3 text-left font-semibold">Date</th>
-                    <th className="px-6 py-3 text-left font-semibold">Actions</th>
+                    {(hasPermission('tests','edit') || hasPermission('tests','delete')) && (
+                      <th className="px-6 py-3 text-left font-semibold">Actions</th>
+                    )}
                   </tr>
                 </thead>
                 <tbody>
@@ -86,10 +88,12 @@ function TestsPage({ token }){
                       <td className="px-6 py-3">{it.class_name}</td>
                       <td className="px-6 py-3">{it.subject_name}</td>
                       <td className="px-6 py-3">{it.date}</td>
-                      <td className="px-6 py-3">
-                        {hasPermission('tests','edit') && <button onClick={()=>handleEdit(it)} className="mr-2 rounded-lg bg-blue-600 px-3 py-1 text-xs text-white hover:bg-blue-500">Edit</button>}
-                        {hasPermission('tests','delete') && <button onClick={()=>handleDelete(it.id)} className="rounded-lg bg-red-600 px-3 py-1 text-xs text-white hover:bg-red-500">Delete</button>}
-                      </td>
+                      {(hasPermission('tests','edit') || hasPermission('tests','delete')) && (
+                        <td className="px-6 py-3">
+                          {hasPermission('tests','edit') && <button onClick={()=>handleEdit(it)} className="mr-2 rounded-lg bg-blue-600 px-3 py-1 text-xs text-white hover:bg-blue-500">Edit</button>}
+                          {hasPermission('tests','delete') && <button onClick={()=>handleDelete(it.id)} className="rounded-lg bg-red-600 px-3 py-1 text-xs text-white hover:bg-red-500">Delete</button>}
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>

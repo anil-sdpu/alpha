@@ -69,9 +69,30 @@ function QuestionsPage({ token }){
             {items.length===0 ? (<p className="p-6 text-slate-400">No questions found.</p>) : (
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-slate-800"><th className="px-6 py-3 text-left font-semibold">Question</th><th className="px-6 py-3 text-left font-semibold">Type</th><th className="px-6 py-3 text-left font-semibold">Marks</th><th className="px-6 py-3 text-left font-semibold">Actions</th></tr>
+                  <tr className="border-b border-slate-800">
+                    <th className="px-6 py-3 text-left font-semibold">Question</th>
+                    <th className="px-6 py-3 text-left font-semibold">Type</th>
+                    <th className="px-6 py-3 text-left font-semibold">Marks</th>
+                    {(hasPermission('questions','edit') || hasPermission('questions','delete')) && (
+                      <th className="px-6 py-3 text-left font-semibold">Actions</th>
+                    )}
+                  </tr>
                 </thead>
-                <tbody>{items.map(q=>(<tr key={q.id} className="border-b border-slate-800 hover:bg-slate-800/50"><td className="px-6 py-3 font-medium">{q.question_text}</td><td className="px-6 py-3">{q.question_type}</td><td className="px-6 py-3">{q.marks}</td><td className="px-6 py-3">{hasPermission('questions','edit') && <button onClick={()=>handleEdit(q)} className="mr-2 rounded-lg bg-blue-600 px-3 py-1 text-xs text-white hover:bg-blue-500">Edit</button>}{hasPermission('questions','delete') && <button onClick={()=>handleDelete(q.id)} className="rounded-lg bg-red-600 px-3 py-1 text-xs text-white hover:bg-red-500">Delete</button>}</td></tr>))}</tbody>
+                <tbody>
+                  {items.map(q => (
+                    <tr key={q.id} className="border-b border-slate-800 hover:bg-slate-800/50">
+                      <td className="px-6 py-3 font-medium">{q.question_text}</td>
+                      <td className="px-6 py-3">{q.question_type}</td>
+                      <td className="px-6 py-3">{q.marks}</td>
+                      {(hasPermission('questions','edit') || hasPermission('questions','delete')) && (
+                        <td className="px-6 py-3">
+                          {hasPermission('questions','edit') && <button onClick={()=>handleEdit(q)} className="mr-2 rounded-lg bg-blue-600 px-3 py-1 text-xs text-white hover:bg-blue-500">Edit</button>}
+                          {hasPermission('questions','delete') && <button onClick={()=>handleDelete(q.id)} className="rounded-lg bg-red-600 px-3 py-1 text-xs text-white hover:bg-red-500">Delete</button>}
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
               </table>
             )}
           </div>

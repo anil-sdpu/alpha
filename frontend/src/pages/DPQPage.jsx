@@ -65,7 +65,9 @@ function DPQPage({ token }){
                     <th className="px-6 py-3 text-left font-semibold">Title</th>
                     <th className="px-6 py-3 text-left font-semibold">Class</th>
                     <th className="px-6 py-3 text-left font-semibold">Publish</th>
-                    <th className="px-6 py-3 text-left font-semibold">Actions</th>
+                    {(hasPermission('dpq','edit') || hasPermission('dpq','delete')) && (
+                      <th className="px-6 py-3 text-left font-semibold">Actions</th>
+                    )}
                   </tr>
                 </thead>
                 <tbody>
@@ -74,10 +76,12 @@ function DPQPage({ token }){
                       <td className="px-6 py-3 font-medium">{d.title}</td>
                       <td className="px-6 py-3">{d.class_name}</td>
                       <td className="px-6 py-3">{d.publish_date}</td>
-                      <td className="px-6 py-3">
-                        {hasPermission('dpq','edit') && <button onClick={()=>handleEdit(d)} className="mr-2 rounded-lg bg-blue-600 px-3 py-1 text-xs text-white hover:bg-blue-500">Edit</button>}
-                        {hasPermission('dpq','delete') && <button onClick={()=>handleDelete(d.id)} className="rounded-lg bg-red-600 px-3 py-1 text-xs text-white hover:bg-red-500">Delete</button>}
-                      </td>
+                      {(hasPermission('dpq','edit') || hasPermission('dpq','delete')) && (
+                        <td className="px-6 py-3">
+                          {hasPermission('dpq','edit') && <button onClick={()=>handleEdit(d)} className="mr-2 rounded-lg bg-blue-600 px-3 py-1 text-xs text-white hover:bg-blue-500">Edit</button>}
+                          {hasPermission('dpq','delete') && <button onClick={()=>handleDelete(d.id)} className="rounded-lg bg-red-600 px-3 py-1 text-xs text-white hover:bg-red-500">Delete</button>}
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>

@@ -61,9 +61,32 @@ function FeesPage({ token }){
             {items.length===0 ? (<p className="p-6 text-slate-400">No payments found.</p>) : (
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-slate-800"><th className="px-6 py-3 text-left font-semibold">Student</th><th className="px-6 py-3 text-left font-semibold">Total</th><th className="px-6 py-3 text-left font-semibold">Paid</th><th className="px-6 py-3 text-left font-semibold">Due</th><th className="px-6 py-3 text-left font-semibold">Actions</th></tr>
+                  <tr className="border-b border-slate-800">
+                    <th className="px-6 py-3 text-left font-semibold">Student</th>
+                    <th className="px-6 py-3 text-left font-semibold">Total</th>
+                    <th className="px-6 py-3 text-left font-semibold">Paid</th>
+                    <th className="px-6 py-3 text-left font-semibold">Due</th>
+                    {(hasPermission('fees','edit') || hasPermission('fees','delete')) && (
+                      <th className="px-6 py-3 text-left font-semibold">Actions</th>
+                    )}
+                  </tr>
                 </thead>
-                <tbody>{items.map(f=>(<tr key={f.id} className="border-b border-slate-800 hover:bg-slate-800/50"><td className="px-6 py-3 font-medium">{f.full_name}</td><td className="px-6 py-3">{f.total_fee}</td><td className="px-6 py-3">{f.paid_amount}</td><td className="px-6 py-3">{f.due_amount}</td><td className="px-6 py-3">{hasPermission('fees','edit') && <button onClick={()=>handleEdit(f)} className="mr-2 rounded-lg bg-blue-600 px-3 py-1 text-xs text-white hover:bg-blue-500">Edit</button>}{hasPermission('fees','delete') && <button onClick={()=>handleDelete(f.id)} className="rounded-lg bg-red-600 px-3 py-1 text-xs text-white hover:bg-red-500">Delete</button>}</td></tr>))}</tbody>
+                <tbody>
+                  {items.map(f => (
+                    <tr key={f.id} className="border-b border-slate-800 hover:bg-slate-800/50">
+                      <td className="px-6 py-3 font-medium">{f.full_name}</td>
+                      <td className="px-6 py-3">{f.total_fee}</td>
+                      <td className="px-6 py-3">{f.paid_amount}</td>
+                      <td className="px-6 py-3">{f.due_amount}</td>
+                      {(hasPermission('fees','edit') || hasPermission('fees','delete')) && (
+                        <td className="px-6 py-3">
+                          {hasPermission('fees','edit') && <button onClick={()=>handleEdit(f)} className="mr-2 rounded-lg bg-blue-600 px-3 py-1 text-xs text-white hover:bg-blue-500">Edit</button>}
+                          {hasPermission('fees','delete') && <button onClick={()=>handleDelete(f.id)} className="rounded-lg bg-red-600 px-3 py-1 text-xs text-white hover:bg-red-500">Delete</button>}
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
               </table>
             )}
           </div>

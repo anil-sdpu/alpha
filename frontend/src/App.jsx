@@ -12,6 +12,8 @@ import DPQPage from './pages/DPQPage';
 import AttendancePage from './pages/AttendancePage';
 import FeesPage from './pages/FeesPage';
 import NotificationsPage from './pages/NotificationsPage';
+import ReportComposer from './pages/ReportComposer';
+import NotificationComposer from './pages/NotificationComposer';
 
 function App() {
   const [token, setToken] = useState(localStorage.getItem('alpha_token') || '');
@@ -31,12 +33,10 @@ function App() {
     localStorage.removeItem('alpha_user');
     setToken('');
     setUser(null);
-    setCurrentPage('dashboard');
+    setCurrentPage('login');
   }
 
-  if (!token) {
-    return <LoginPage onLogin={handleLogin} />;
-  }
+  // Always render the app shell; show LoginPage inside main when not authenticated
 
   return (
     <div className="flex min-h-screen bg-slate-950">
@@ -56,10 +56,21 @@ function App() {
               { id: 'dpq', label: 'DPQ', entity: 'dpq' },
               { id: 'attendance', label: 'Attendance', entity: 'attendance' },
               { id: 'fees', label: 'Fees', entity: 'fees' },
-              { id: 'notifications', label: 'Notifications', entity: 'notifications' }
+              { id: 'notifications', label: 'Notifications', entity: 'notifications' },
+              // reports requires the ability to edit student records (compose reports)
+              { id: 'reports', label: 'Reports', entity: 'students', requiredAction: 'edit' },
+              // compose requires notifications:create
+              { id: 'compose', label: 'Compose', entity: 'notifications', requiredAction: 'create' }
             ];
 
-            return items.filter(i => !i.entity || hasPermission(i.entity, 'view')).map((item) => (
+            return items
+              .filter(i => {
+                if (!i.entity) return true;
+                if (!hasPermission(i.entity, 'view')) return false;
+                if (i.requiredAction && !hasPermission(i.entity, i.requiredAction)) return false;
+                return true;
+              })
+              .map((item) => (
               <button
                 key={item.id}
                 onClick={() => setCurrentPage(item.id)}
@@ -83,17 +94,25 @@ function App() {
       </aside>
 
       <main className="flex-1">
-        {currentPage === 'dashboard' && <DashboardPage token={token} user={user} />}
-        {currentPage === 'students' && <StudentsPage token={token} />}
-        {currentPage === 'classes' && <ClassesPage token={token} />}
-        {currentPage === 'subjects' && <SubjectsPage token={token} />}
-        {currentPage === 'chapters' && <ChaptersPage token={token} />}
-        {currentPage === 'tests' && <TestsPage token={token} />}
-        {currentPage === 'questions' && <QuestionsPage token={token} />}
-        {currentPage === 'dpq' && <DPQPage token={token} />}
-        {currentPage === 'attendance' && <AttendancePage token={token} />}
-        {currentPage === 'fees' && <FeesPage token={token} />}
-        {currentPage === 'notifications' && <NotificationsPage token={token} />}
+        {!token ? (
+          <LoginPage onLogin={handleLogin} />
+        ) : (
+          <>
+            {currentPage === 'dashboard' && <DashboardPage token={token} user={user} />}
+            {currentPage === 'students' && <StudentsPage token={token} />}
+            {currentPage === 'classes' && <ClassesPage token={token} />}
+            {currentPage === 'subjects' && <SubjectsPage token={token} />}
+            {currentPage === 'chapters' && <ChaptersPage token={token} />}
+            {currentPage === 'tests' && <TestsPage token={token} />}
+            {currentPage === 'questions' && <QuestionsPage token={token} />}
+            {currentPage === 'dpq' && <DPQPage token={token} />}
+            {currentPage === 'attendance' && <AttendancePage token={token} />}
+            {currentPage === 'fees' && <FeesPage token={token} />}
+            {currentPage === 'notifications' && <NotificationsPage token={token} />}
+            {currentPage === 'reports' && <ReportComposer token={token} />}
+            {currentPage === 'compose' && <NotificationComposer token={token} />}
+          </>
+        )}
       </main>
     </div>
   );

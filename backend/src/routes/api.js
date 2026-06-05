@@ -3,10 +3,12 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const pool = require('../db');
 const { authenticate } = require('../middleware/auth');
+const { requirePermission } = require('../middleware/permissions');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const PDFDocument = require('pdfkit');
+const nodemailer = require('nodemailer');
 
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'change-me';
@@ -41,7 +43,7 @@ router.get('/profile', authenticate, async (req, res) => {
   res.json({ profile: req.user });
 });
 
-router.get('/students', authenticate, async (req, res) => {
+router.get('/students', authenticate, requirePermission('students','view'), async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT s.id, s.full_name, s.gender, s.mobile, s.email, c.class_name FROM students s LEFT JOIN classes c ON s.class_id = c.id LIMIT 50');
     res.json({ data: rows });
@@ -51,7 +53,7 @@ router.get('/students', authenticate, async (req, res) => {
   }
 });
 
-router.get('/classes', authenticate, async (req, res) => {
+router.get('/classes', authenticate, requirePermission('classes','view'), async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT id, class_name, academic_year, description FROM classes LIMIT 50');
     res.json({ data: rows });
@@ -61,7 +63,7 @@ router.get('/classes', authenticate, async (req, res) => {
   }
 });
 
-router.get('/subjects', authenticate, async (req, res) => {
+router.get('/subjects', authenticate, requirePermission('subjects','view'), async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT id, subject_name, subject_code, description FROM subjects LIMIT 50');
     res.json({ data: rows });
@@ -72,7 +74,7 @@ router.get('/subjects', authenticate, async (req, res) => {
 });
 
 // Classes CRUD
-router.post('/classes', authenticate, async (req, res) => {
+router.post('/classes', authenticate, requirePermission('classes','create'), async (req, res) => {
   const { class_name, academic_year, description } = req.body;
   if (!class_name) return res.status(400).json({ error: 'class_name required' });
   try {
@@ -84,7 +86,7 @@ router.post('/classes', authenticate, async (req, res) => {
   }
 });
 
-router.put('/classes/:id', authenticate, async (req, res) => {
+router.put('/classes/:id', authenticate, requirePermission('classes','edit'), async (req, res) => {
   const { id } = req.params;
   const { class_name, academic_year, description } = req.body;
   try {
@@ -96,7 +98,7 @@ router.put('/classes/:id', authenticate, async (req, res) => {
   }
 });
 
-router.delete('/classes/:id', authenticate, async (req, res) => {
+router.delete('/classes/:id', authenticate, requirePermission('classes','delete'), async (req, res) => {
   const { id } = req.params;
   try {
     await pool.query('DELETE FROM classes WHERE id = ?', [id]);
@@ -108,7 +110,7 @@ router.delete('/classes/:id', authenticate, async (req, res) => {
 });
 
 // Subjects CRUD
-router.post('/subjects', authenticate, async (req, res) => {
+router.post('/subjects', authenticate, requirePermission('subjects','create'), async (req, res) => {
   const { class_id, subject_name, subject_code, description } = req.body;
   if (!subject_name) return res.status(400).json({ error: 'subject_name required' });
   try {
@@ -120,7 +122,7 @@ router.post('/subjects', authenticate, async (req, res) => {
   }
 });
 
-router.put('/subjects/:id', authenticate, async (req, res) => {
+router.put('/subjects/:id', authenticate, requirePermission('subjects','edit'), async (req, res) => {
   const { id } = req.params;
   const { class_id, subject_name, subject_code, description } = req.body;
   try {
@@ -132,7 +134,7 @@ router.put('/subjects/:id', authenticate, async (req, res) => {
   }
 });
 
-router.delete('/subjects/:id', authenticate, async (req, res) => {
+router.delete('/subjects/:id', authenticate, requirePermission('subjects','delete'), async (req, res) => {
   const { id } = req.params;
   try {
     await pool.query('DELETE FROM subjects WHERE id = ?', [id]);
@@ -144,7 +146,7 @@ router.delete('/subjects/:id', authenticate, async (req, res) => {
 });
 
 // Students CRUD
-router.get('/students/:id', authenticate, async (req, res) => {
+router.get('/students/:id', authenticate, requirePermission('students','view'), async (req, res) => {
   const { id } = req.params;
   try {
     const [rows] = await pool.query('SELECT * FROM students WHERE id = ? LIMIT 1', [id]);
@@ -156,7 +158,7 @@ router.get('/students/:id', authenticate, async (req, res) => {
   }
 });
 
-router.post('/students', authenticate, async (req, res) => {
+router.post('/students', authenticate, requirePermission('students','create'), async (req, res) => {
   const { full_name, gender, dob, mobile, parent_name, parent_contact, address, email, admission_date, class_id, section, status } = req.body;
   if (!full_name) return res.status(400).json({ error: 'full_name required' });
   try {
@@ -171,7 +173,7 @@ router.post('/students', authenticate, async (req, res) => {
   }
 });
 
-router.put('/students/:id', authenticate, async (req, res) => {
+router.put('/students/:id', authenticate, requirePermission('students','edit'), async (req, res) => {
   const { id } = req.params;
   const { full_name, gender, dob, mobile, parent_name, parent_contact, address, email, admission_date, class_id, section } = req.body;
   try {
@@ -186,7 +188,7 @@ router.put('/students/:id', authenticate, async (req, res) => {
   }
 });
 
-router.delete('/students/:id', authenticate, async (req, res) => {
+router.delete('/students/:id', authenticate, requirePermission('students','delete'), async (req, res) => {
   const { id } = req.params;
   try {
     await pool.query('DELETE FROM students WHERE id = ?', [id]);
@@ -198,7 +200,7 @@ router.delete('/students/:id', authenticate, async (req, res) => {
 });
 
 // Chapters CRUD
-router.get('/chapters', authenticate, async (req, res) => {
+router.get('/chapters', authenticate, requirePermission('chapters','view'), async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT ch.id, ch.title, ch.chapter_number, ch.status, s.subject_name FROM chapters ch LEFT JOIN subjects s ON ch.subject_id = s.id LIMIT 200');
     res.json({ data: rows });
@@ -208,7 +210,7 @@ router.get('/chapters', authenticate, async (req, res) => {
   }
 });
 
-router.post('/chapters', authenticate, async (req, res) => {
+router.post('/chapters', authenticate, requirePermission('chapters','create'), async (req, res) => {
   const { subject_id, chapter_number, title, notes_path, status } = req.body;
   if (!subject_id || !title) return res.status(400).json({ error: 'subject_id and title required' });
   try {
@@ -220,7 +222,7 @@ router.post('/chapters', authenticate, async (req, res) => {
   }
 });
 
-router.put('/chapters/:id', authenticate, async (req, res) => {
+router.put('/chapters/:id', authenticate, requirePermission('chapters','edit'), async (req, res) => {
   const { id } = req.params;
   const { subject_id, chapter_number, title, notes_path, status } = req.body;
   try {
@@ -232,7 +234,7 @@ router.put('/chapters/:id', authenticate, async (req, res) => {
   }
 });
 
-router.delete('/chapters/:id', authenticate, async (req, res) => {
+router.delete('/chapters/:id', authenticate, requirePermission('chapters','delete'), async (req, res) => {
   const { id } = req.params;
   try {
     await pool.query('DELETE FROM chapters WHERE id = ?', [id]);
@@ -244,7 +246,7 @@ router.delete('/chapters/:id', authenticate, async (req, res) => {
 });
 
 // Tests CRUD
-router.get('/tests', authenticate, async (req, res) => {
+router.get('/tests', authenticate, requirePermission('tests','view'), async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT t.*, c.class_name, s.subject_name, ch.title as chapter_title FROM tests t LEFT JOIN classes c ON t.class_id = c.id LEFT JOIN subjects s ON t.subject_id = s.id LEFT JOIN chapters ch ON t.chapter_id = ch.id ORDER BY t.date DESC LIMIT 200');
     res.json({ data: rows });
@@ -254,7 +256,7 @@ router.get('/tests', authenticate, async (req, res) => {
   }
 });
 
-router.post('/tests', authenticate, async (req, res) => {
+router.post('/tests', authenticate, requirePermission('tests','create'), async (req, res) => {
   const { class_id, subject_id, chapter_id, test_type, title, date, start_time, end_time, total_marks, duration_minutes, instructions } = req.body;
   if (!class_id || !subject_id || !title || !date) return res.status(400).json({ error: 'class_id, subject_id, title and date required' });
   try {
@@ -266,7 +268,7 @@ router.post('/tests', authenticate, async (req, res) => {
   }
 });
 
-router.put('/tests/:id', authenticate, async (req, res) => {
+router.put('/tests/:id', authenticate, requirePermission('tests','edit'), async (req, res) => {
   const { id } = req.params;
   const { class_id, subject_id, chapter_id, test_type, title, date, start_time, end_time, total_marks, duration_minutes, instructions } = req.body;
   try {
@@ -278,7 +280,7 @@ router.put('/tests/:id', authenticate, async (req, res) => {
   }
 });
 
-router.delete('/tests/:id', authenticate, async (req, res) => {
+router.delete('/tests/:id', authenticate, requirePermission('tests','delete'), async (req, res) => {
   const { id } = req.params;
   try {
     await pool.query('DELETE FROM tests WHERE id = ?', [id]);
@@ -290,7 +292,7 @@ router.delete('/tests/:id', authenticate, async (req, res) => {
 });
 
 // Questions CRUD
-router.get('/questions', authenticate, async (req, res) => {
+router.get('/questions', authenticate, requirePermission('questions','view'), async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT q.*, s.subject_name, ch.title as chapter_title FROM questions q LEFT JOIN subjects s ON q.subject_id = s.id LEFT JOIN chapters ch ON q.chapter_id = ch.id ORDER BY q.created_at DESC LIMIT 500');
     res.json({ data: rows });
@@ -300,7 +302,7 @@ router.get('/questions', authenticate, async (req, res) => {
   }
 });
 
-router.post('/questions', authenticate, async (req, res) => {
+router.post('/questions', authenticate, requirePermission('questions','create'), async (req, res) => {
   const { subject_id, chapter_id, question_type, question_text, options, correct_answer, marks, difficulty, tags } = req.body;
   if (!question_text) return res.status(400).json({ error: 'question_text required' });
   try {
@@ -313,7 +315,7 @@ router.post('/questions', authenticate, async (req, res) => {
   }
 });
 
-router.put('/questions/:id', authenticate, async (req, res) => {
+router.put('/questions/:id', authenticate, requirePermission('questions','edit'), async (req, res) => {
   const { id } = req.params;
   const { subject_id, chapter_id, question_type, question_text, options, correct_answer, marks, difficulty, tags } = req.body;
   try {
@@ -326,7 +328,7 @@ router.put('/questions/:id', authenticate, async (req, res) => {
   }
 });
 
-router.delete('/questions/:id', authenticate, async (req, res) => {
+router.delete('/questions/:id', authenticate, requirePermission('questions','delete'), async (req, res) => {
   const { id } = req.params;
   try {
     await pool.query('DELETE FROM questions WHERE id = ?', [id]);
@@ -338,7 +340,7 @@ router.delete('/questions/:id', authenticate, async (req, res) => {
 });
 
 // Question Papers (basic)
-router.get('/question_papers', authenticate, async (req, res) => {
+router.get('/question_papers', authenticate, requirePermission('tests','view'), async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT qp.*, t.title as test_title, u.full_name as generated_by_name FROM question_papers qp LEFT JOIN tests t ON qp.test_id = t.id LEFT JOIN users u ON qp.generated_by = u.id ORDER BY qp.created_at DESC LIMIT 200');
     res.json({ data: rows });
@@ -348,7 +350,7 @@ router.get('/question_papers', authenticate, async (req, res) => {
   }
 });
 
-router.post('/question_papers', authenticate, async (req, res) => {
+router.post('/question_papers', authenticate, requirePermission('tests','create'), async (req, res) => {
   const { test_id, title, generated_by, pdf_path } = req.body;
   if (!test_id || !title) return res.status(400).json({ error: 'test_id and title required' });
   try {
@@ -377,7 +379,7 @@ const storage = multer.diskStorage({
 const upload = multer({ storage });
 
 // Upload PDF for question paper and optionally create record
-router.post('/upload/question_paper', authenticate, upload.single('file'), async (req, res) => {
+router.post('/upload/question_paper', authenticate, requirePermission('tests','create'), upload.single('file'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
     const relPath = path.join('uploads', 'question_papers', req.file.filename).replace(/\\/g, '/');
@@ -395,7 +397,7 @@ router.post('/upload/question_paper', authenticate, upload.single('file'), async
 });
 
 // Generate a simple PDF question paper from question ids
-router.post('/question_papers/generate', authenticate, async (req, res) => {
+router.post('/question_papers/generate', authenticate, requirePermission('tests','create'), async (req, res) => {
   try {
     const { test_id, title, question_ids } = req.body;
     if (!test_id || !title || !Array.isArray(question_ids) || question_ids.length === 0) return res.status(400).json({ error: 'test_id, title and question_ids required' });
@@ -445,7 +447,7 @@ router.post('/question_papers/generate', authenticate, async (req, res) => {
 });
 
 // DPQ CRUD
-router.get('/dpq', authenticate, async (req, res) => {
+router.get('/dpq', authenticate, requirePermission('dpq','view'), async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT d.*, c.class_name, s.subject_name, ch.title as chapter_title FROM dpq d LEFT JOIN classes c ON d.class_id = c.id LEFT JOIN subjects s ON d.subject_id = s.id LEFT JOIN chapters ch ON d.chapter_id = ch.id ORDER BY d.publish_date DESC LIMIT 200');
     res.json({ data: rows });
@@ -455,7 +457,7 @@ router.get('/dpq', authenticate, async (req, res) => {
   }
 });
 
-router.post('/dpq', authenticate, async (req, res) => {
+router.post('/dpq', authenticate, requirePermission('dpq','create'), async (req, res) => {
   const { class_id, subject_id, chapter_id, title, description, publish_date, due_date, status } = req.body;
   if (!class_id || !title || !publish_date) return res.status(400).json({ error: 'class_id, title and publish_date required' });
   try {
@@ -467,7 +469,7 @@ router.post('/dpq', authenticate, async (req, res) => {
   }
 });
 
-router.put('/dpq/:id', authenticate, async (req, res) => {
+router.put('/dpq/:id', authenticate, requirePermission('dpq','edit'), async (req, res) => {
   const { id } = req.params;
   const { class_id, subject_id, chapter_id, title, description, publish_date, due_date, status } = req.body;
   try {
@@ -479,7 +481,7 @@ router.put('/dpq/:id', authenticate, async (req, res) => {
   }
 });
 
-router.delete('/dpq/:id', authenticate, async (req, res) => {
+router.delete('/dpq/:id', authenticate, requirePermission('dpq','delete'), async (req, res) => {
   const { id } = req.params;
   try {
     await pool.query('DELETE FROM dpq WHERE id = ?', [id]);
@@ -491,7 +493,7 @@ router.delete('/dpq/:id', authenticate, async (req, res) => {
 });
 
 // Attendance CRUD
-router.get('/attendance', authenticate, async (req, res) => {
+router.get('/attendance', authenticate, requirePermission('attendance','view'), async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT a.*, s.full_name, c.class_name FROM attendance a LEFT JOIN students s ON a.student_id = s.id LEFT JOIN classes c ON a.class_id = c.id ORDER BY a.attendance_date DESC LIMIT 500');
     res.json({ data: rows });
@@ -501,7 +503,7 @@ router.get('/attendance', authenticate, async (req, res) => {
   }
 });
 
-router.post('/attendance', authenticate, async (req, res) => {
+router.post('/attendance', authenticate, requirePermission('attendance','create'), async (req, res) => {
   const { student_id, class_id, attendance_date, status, remarks } = req.body;
   if (!student_id || !class_id || !attendance_date) return res.status(400).json({ error: 'student_id, class_id and attendance_date required' });
   try {
@@ -513,7 +515,7 @@ router.post('/attendance', authenticate, async (req, res) => {
   }
 });
 
-router.put('/attendance/:id', authenticate, async (req, res) => {
+router.put('/attendance/:id', authenticate, requirePermission('attendance','edit'), async (req, res) => {
   const { id } = req.params;
   const { student_id, class_id, attendance_date, status, remarks } = req.body;
   try {
@@ -525,7 +527,7 @@ router.put('/attendance/:id', authenticate, async (req, res) => {
   }
 });
 
-router.delete('/attendance/:id', authenticate, async (req, res) => {
+router.delete('/attendance/:id', authenticate, requirePermission('attendance','delete'), async (req, res) => {
   const { id } = req.params;
   try {
     await pool.query('DELETE FROM attendance WHERE id = ?', [id]);
@@ -537,7 +539,7 @@ router.delete('/attendance/:id', authenticate, async (req, res) => {
 });
 
 // Fees CRUD
-router.get('/fees', authenticate, async (req, res) => {
+router.get('/fees', authenticate, requirePermission('fees','view'), async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT f.*, s.full_name FROM fees f LEFT JOIN students s ON f.student_id = s.id ORDER BY f.created_at DESC LIMIT 500');
     res.json({ data: rows });
@@ -547,7 +549,7 @@ router.get('/fees', authenticate, async (req, res) => {
   }
 });
 
-router.post('/fees', authenticate, async (req, res) => {
+router.post('/fees', authenticate, requirePermission('fees','create'), async (req, res) => {
   const { student_id, total_fee, paid_amount, due_amount, payment_date, payment_mode, status, remarks } = req.body;
   if (!student_id) return res.status(400).json({ error: 'student_id required' });
   try {
@@ -559,7 +561,7 @@ router.post('/fees', authenticate, async (req, res) => {
   }
 });
 
-router.put('/fees/:id', authenticate, async (req, res) => {
+router.put('/fees/:id', authenticate, requirePermission('fees','edit'), async (req, res) => {
   const { id } = req.params;
   const { student_id, total_fee, paid_amount, due_amount, payment_date, payment_mode, status, remarks } = req.body;
   try {
@@ -571,7 +573,7 @@ router.put('/fees/:id', authenticate, async (req, res) => {
   }
 });
 
-router.delete('/fees/:id', authenticate, async (req, res) => {
+router.delete('/fees/:id', authenticate, requirePermission('fees','delete'), async (req, res) => {
   const { id } = req.params;
   try {
     await pool.query('DELETE FROM fees WHERE id = ?', [id]);
@@ -583,7 +585,7 @@ router.delete('/fees/:id', authenticate, async (req, res) => {
 });
 
 // Notifications CRUD
-router.get('/notifications', authenticate, async (req, res) => {
+router.get('/notifications', authenticate, requirePermission('notifications','view'), async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT * FROM notifications ORDER BY send_date DESC LIMIT 500');
     res.json({ data: rows });
@@ -593,7 +595,7 @@ router.get('/notifications', authenticate, async (req, res) => {
   }
 });
 
-router.post('/notifications', authenticate, async (req, res) => {
+router.post('/notifications', authenticate, requirePermission('notifications','create'), async (req, res) => {
   const { recipient_role, recipient_id, type, message, channel, is_read } = req.body;
   if (!message) return res.status(400).json({ error: 'message required' });
   try {
@@ -605,7 +607,7 @@ router.post('/notifications', authenticate, async (req, res) => {
   }
 });
 
-router.put('/notifications/:id', authenticate, async (req, res) => {
+router.put('/notifications/:id', authenticate, requirePermission('notifications','edit'), async (req, res) => {
   const { id } = req.params;
   const { recipient_role, recipient_id, type, message, channel, is_read } = req.body;
   try {
@@ -617,7 +619,7 @@ router.put('/notifications/:id', authenticate, async (req, res) => {
   }
 });
 
-router.delete('/notifications/:id', authenticate, async (req, res) => {
+router.delete('/notifications/:id', authenticate, requirePermission('notifications','delete'), async (req, res) => {
   const { id } = req.params;
   try {
     await pool.query('DELETE FROM notifications WHERE id = ?', [id]);
@@ -628,4 +630,138 @@ router.delete('/notifications/:id', authenticate, async (req, res) => {
   }
 });
 
+// Helper: create SMTP transporter if configured
+function getTransporter() {
+  const host = process.env.SMTP_HOST;
+  const port = process.env.SMTP_PORT;
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
+  if (!host || !port || !user || !pass) return null;
+  return nodemailer.createTransport({ host, port: Number(port), secure: false, auth: { user, pass } });
+}
+
+// Generate a marks card PDF and optionally send to parent email
+router.post('/reports/markcard', authenticate, requirePermission('students','edit'), async (req, res) => {
+  try {
+    const { student_id, period, period_label, grades, comments, send_email, recipient_email } = req.body;
+    if (!student_id || !period || !Array.isArray(grades)) return res.status(400).json({ error: 'student_id, period and grades[] required' });
+    const [srows] = await pool.query('SELECT * FROM students WHERE id = ? LIMIT 1', [student_id]);
+    if (!srows[0]) return res.status(404).json({ error: 'Student not found' });
+    const student = srows[0];
+
+    // create pdf
+    const filename = `${Date.now()}-markcard-${student.id}.pdf`;
+    const outDir = path.join(uploadsRoot, 'reports');
+    fs.mkdirSync(outDir, { recursive: true });
+    const outPath = path.join(outDir, filename);
+    const doc = new PDFDocument({ margin: 40 });
+    const stream = fs.createWriteStream(outPath);
+    doc.pipe(stream);
+    doc.fontSize(20).text('Marksheet / Report Card', { align: 'center' });
+    doc.moveDown();
+    doc.fontSize(12).text(`Name: ${student.full_name}`);
+    doc.text(`Class ID: ${student.class_id || 'N/A'}`);
+    doc.text(`Period: ${period} ${period_label ? '('+period_label+')' : ''}`);
+    doc.moveDown();
+
+    let totalObt = 0, totalMax = 0;
+    doc.fontSize(12);
+    for (const g of grades) {
+      const subj = g.subject_name || g.subject_id || 'Subject';
+      const obt = Number(g.obtained || 0);
+      const max = Number(g.total || 100);
+      totalObt += obt;
+      totalMax += max;
+      doc.text(`${subj}: ${obt} / ${max}    Grade: ${g.grade || ''}    Remarks: ${g.remarks || ''}`);
+    }
+    const percent = totalMax ? Math.round((totalObt / totalMax) * 10000) / 100 : 0;
+    doc.moveDown();
+    doc.text(`Total: ${totalObt} / ${totalMax}    Percentage: ${percent}%`);
+    if (comments) {
+      doc.moveDown();
+      doc.text(`Comments: ${comments}`);
+    }
+    doc.moveDown();
+    doc.text(`Generated by: ${req.user.name || req.user.id} on ${new Date().toLocaleString()}`);
+    doc.end();
+    await new Promise((resolve) => stream.on('finish', resolve));
+    const relPath = path.join('uploads', 'reports', filename).replace(/\\/g, '/');
+
+    // persist record if reports table exists (silent failure if not)
+    try {
+      await pool.query('INSERT INTO reports (student_id, period, file_path, created_by, notes) VALUES (?, ?, ?, ?, ?)', [student_id, period, relPath, req.user.id, comments || null]);
+    } catch (e) {
+      // ignore if table missing
+    }
+
+    // send email if requested
+    if (send_email) {
+      const transporter = getTransporter();
+      const to = recipient_email || student.email || null;
+      if (!transporter) return res.status(500).json({ error: 'SMTP not configured' });
+      if (!to) return res.status(400).json({ error: 'No recipient email available' });
+      const mail = {
+        from: process.env.FROM_EMAIL || process.env.SMTP_USER,
+        to,
+        subject: `Report Card - ${student.full_name} - ${period}`,
+        text: `Please find attached the report card for ${student.full_name}.`,
+        attachments: [{ filename, path: outPath }]
+      };
+      await transporter.sendMail(mail);
+    }
+
+    res.json({ path: relPath });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Unable to generate report' });
+  }
+});
+
+// Send notification emails / mass alerts
+router.post('/notifications/send', authenticate, requirePermission('notifications','create'), async (req, res) => {
+  try {
+    const { title, message, priority, due_date, recipient_role, recipient_ids, channel } = req.body;
+    if (!message) return res.status(400).json({ error: 'message required' });
+
+    // resolve recipients
+    let recipients = [];
+    if (Array.isArray(recipient_ids) && recipient_ids.length) {
+      // assume student ids
+      const [rows] = await pool.query('SELECT id, full_name, email, parent_contact FROM students WHERE id IN (?)', [recipient_ids]);
+      recipients = rows.map(r => ({ id: r.id, name: r.full_name, email: r.email }));
+    } else if (recipient_role === 'tutor') {
+      const [rows] = await pool.query('SELECT id, full_name, email FROM users WHERE role = ?', ['tutor']);
+      recipients = rows.map(r => ({ id: r.id, name: r.full_name, email: r.email }));
+    } else {
+      // default to students/all
+      const [rows] = await pool.query('SELECT id, full_name, email FROM students');
+      recipients = rows.map(r => ({ id: r.id, name: r.full_name, email: r.email }));
+    }
+
+    // insert notifications and optionally send email
+    const transporter = getTransporter();
+    let sent = 0, failed = 0;
+    for (const r of recipients) {
+      try {
+        await pool.query('INSERT INTO notifications (recipient_role, recipient_id, type, message, channel, is_read, send_date, priority, due_date) VALUES (?, ?, ?, ?, ?, ?, NOW(), ?, ?)', [recipient_role || 'student', r.id, 'alert', message, channel || 'in-app', 0, priority || 'normal', due_date || null]);
+        if (channel && channel.includes('email')) {
+          if (!transporter) throw new Error('SMTP not configured');
+          if (!r.email) throw new Error('No email for recipient');
+          await transporter.sendMail({ from: process.env.FROM_EMAIL || process.env.SMTP_USER, to: r.email, subject: title || 'Notification', text: message });
+        }
+        sent++;
+      } catch (e) {
+        console.error('Failed to notify', r.id, e.message || e);
+        failed++;
+      }
+    }
+
+    res.json({ ok: true, sent, failed });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Unable to send notifications' });
+  }
+});
+
 module.exports = router;
+

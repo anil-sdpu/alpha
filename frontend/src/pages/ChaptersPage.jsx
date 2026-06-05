@@ -91,7 +91,9 @@ function ChaptersPage({ token }) {
                     <th className="px-6 py-3 text-left font-semibold">Title</th>
                     <th className="px-6 py-3 text-left font-semibold">Subject</th>
                     <th className="px-6 py-3 text-left font-semibold">#</th>
-                    <th className="px-6 py-3 text-left font-semibold">Actions</th>
+                    {(hasPermission('chapters','edit') || hasPermission('chapters','delete')) && (
+                      <th className="px-6 py-3 text-left font-semibold">Actions</th>
+                    )}
                   </tr>
                 </thead>
                 <tbody>
@@ -100,10 +102,12 @@ function ChaptersPage({ token }) {
                       <td className="px-6 py-3 font-medium">{it.title}</td>
                       <td className="px-6 py-3">{it.subject_name || '-'}</td>
                       <td className="px-6 py-3">{it.chapter_number}</td>
-                      <td className="px-6 py-3">
-                        {hasPermission('chapters','edit') && <button onClick={() => handleEdit(it)} className="mr-2 rounded-lg bg-blue-600 px-3 py-1 text-xs text-white hover:bg-blue-500">Edit</button>}
-                        {hasPermission('chapters','delete') && <button onClick={() => handleDelete(it.id)} className="rounded-lg bg-red-600 px-3 py-1 text-xs text-white hover:bg-red-500">Delete</button>}
-                      </td>
+                      {(hasPermission('chapters','edit') || hasPermission('chapters','delete')) && (
+                        <td className="px-6 py-3">
+                          {hasPermission('chapters','edit') && <button onClick={() => handleEdit(it)} className="mr-2 rounded-lg bg-blue-600 px-3 py-1 text-xs text-white hover:bg-blue-500">Edit</button>}
+                          {hasPermission('chapters','delete') && <button onClick={() => handleDelete(it.id)} className="rounded-lg bg-red-600 px-3 py-1 text-xs text-white hover:bg-red-500">Delete</button>}
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>

@@ -61,9 +61,32 @@ function AttendancePage({ token }){
             {items.length===0 ? (<p className="p-6 text-slate-400">No attendance records.</p>) : (
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-slate-800"><th className="px-6 py-3 text-left font-semibold">Student</th><th className="px-6 py-3 text-left font-semibold">Class</th><th className="px-6 py-3 text-left font-semibold">Date</th><th className="px-6 py-3 text-left font-semibold">Status</th><th className="px-6 py-3 text-left font-semibold">Actions</th></tr>
+                  <tr className="border-b border-slate-800">
+                    <th className="px-6 py-3 text-left font-semibold">Student</th>
+                    <th className="px-6 py-3 text-left font-semibold">Class</th>
+                    <th className="px-6 py-3 text-left font-semibold">Date</th>
+                    <th className="px-6 py-3 text-left font-semibold">Status</th>
+                    {(hasPermission('attendance','edit') || hasPermission('attendance','delete')) && (
+                      <th className="px-6 py-3 text-left font-semibold">Actions</th>
+                    )}
+                  </tr>
                 </thead>
-                <tbody>{items.map(a=>(<tr key={a.id} className="border-b border-slate-800 hover:bg-slate-800/50"><td className="px-6 py-3 font-medium">{a.full_name}</td><td className="px-6 py-3">{a.class_name}</td><td className="px-6 py-3">{a.attendance_date}</td><td className="px-6 py-3">{a.status}</td><td className="px-6 py-3">{hasPermission('attendance','edit') && <button onClick={()=>handleEdit(a)} className="mr-2 rounded-lg bg-blue-600 px-3 py-1 text-xs text-white hover:bg-blue-500">Edit</button>}{hasPermission('attendance','delete') && <button onClick={()=>handleDelete(a.id)} className="rounded-lg bg-red-600 px-3 py-1 text-xs text-white hover:bg-red-500">Delete</button>}</td></tr>))}</tbody>
+                <tbody>
+                  {items.map(a => (
+                    <tr key={a.id} className="border-b border-slate-800 hover:bg-slate-800/50">
+                      <td className="px-6 py-3 font-medium">{a.full_name}</td>
+                      <td className="px-6 py-3">{a.class_name}</td>
+                      <td className="px-6 py-3">{a.attendance_date}</td>
+                      <td className="px-6 py-3">{a.status}</td>
+                      {(hasPermission('attendance','edit') || hasPermission('attendance','delete')) && (
+                        <td className="px-6 py-3">
+                          {hasPermission('attendance','edit') && <button onClick={()=>handleEdit(a)} className="mr-2 rounded-lg bg-blue-600 px-3 py-1 text-xs text-white hover:bg-blue-500">Edit</button>}
+                          {hasPermission('attendance','delete') && <button onClick={()=>handleDelete(a.id)} className="rounded-lg bg-red-600 px-3 py-1 text-xs text-white hover:bg-red-500">Delete</button>}
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
               </table>
             )}
           </div>

@@ -59,9 +59,31 @@ function NotificationsPage({ token }){
             {items.length===0 ? (<p className="p-6 text-slate-400">No notifications found.</p>) : (
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-slate-800"><th className="px-6 py-3 text-left font-semibold">Message</th><th className="px-6 py-3 text-left font-semibold">Role</th><th className="px-6 py-3 text-left font-semibold">Date</th><th className="px-6 py-3 text-left font-semibold">Actions</th></tr>
+                  <tr className="border-b border-slate-800">
+                    <th className="px-6 py-3 text-left font-semibold">Message</th>
+                    <th className="px-6 py-3 text-left font-semibold">Role</th>
+                    <th className="px-6 py-3 text-left font-semibold">Date</th>
+                    {(hasPermission('notifications','edit') || hasPermission('notifications','delete')) && (
+                      <th className="px-6 py-3 text-left font-semibold">Actions</th>
+                    )}
+                  </tr>
                 </thead>
-                <tbody>{items.map(n=>(<tr key={n.id} className="border-b border-slate-800 hover:bg-slate-800/50"><td className="px-6 py-3 font-medium">{n.message}</td><td className="px-6 py-3">{n.recipient_role}</td><td className="px-6 py-3">{n.send_date}</td><td className="px-6 py-3">{!n.is_read && hasPermission('notifications','edit') && <button onClick={()=>handleMarkRead(n.id)} className="mr-2 rounded-lg bg-emerald-600 px-3 py-1 text-xs text-white hover:bg-emerald-500">Mark Read</button>}{hasPermission('notifications','edit') && <button onClick={()=>handleEdit(n)} className="mr-2 rounded-lg bg-blue-600 px-3 py-1 text-xs text-white hover:bg-blue-500">Edit</button>}{hasPermission('notifications','delete') && <button onClick={()=>handleDelete(n.id)} className="rounded-lg bg-red-600 px-3 py-1 text-xs text-white hover:bg-red-500">Delete</button>}</td></tr>))}</tbody>
+                <tbody>
+                  {items.map(n => (
+                    <tr key={n.id} className="border-b border-slate-800 hover:bg-slate-800/50">
+                      <td className="px-6 py-3 font-medium">{n.message}</td>
+                      <td className="px-6 py-3">{n.recipient_role}</td>
+                      <td className="px-6 py-3">{n.send_date}</td>
+                      {(hasPermission('notifications','edit') || hasPermission('notifications','delete')) && (
+                        <td className="px-6 py-3">
+                          {!n.is_read && hasPermission('notifications','edit') && <button onClick={()=>handleMarkRead(n.id)} className="mr-2 rounded-lg bg-emerald-600 px-3 py-1 text-xs text-white hover:bg-emerald-500">Mark Read</button>}
+                          {hasPermission('notifications','edit') && <button onClick={()=>handleEdit(n)} className="mr-2 rounded-lg bg-blue-600 px-3 py-1 text-xs text-white hover:bg-blue-500">Edit</button>}
+                          {hasPermission('notifications','delete') && <button onClick={()=>handleDelete(n.id)} className="rounded-lg bg-red-600 px-3 py-1 text-xs text-white hover:bg-red-500">Delete</button>}
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
               </table>
             )}
           </div>

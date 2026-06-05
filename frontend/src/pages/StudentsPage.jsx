@@ -279,7 +279,9 @@ function StudentsPage({ token }) {
                       <th className="px-6 py-3 text-left font-semibold">Class</th>
                       <th className="px-6 py-3 text-left font-semibold">Email</th>
                       <th className="px-6 py-3 text-left font-semibold">Mobile</th>
-                      <th className="px-6 py-3 text-left font-semibold">Actions</th>
+                      {(hasPermission('students','edit') || hasPermission('students','delete')) && (
+                        <th className="px-6 py-3 text-left font-semibold">Actions</th>
+                      )}
                     </tr>
                   </thead>
                   <tbody>
@@ -289,6 +291,7 @@ function StudentsPage({ token }) {
                         <td className="px-6 py-3">{student.class_name || '-'}</td>
                         <td className="px-6 py-3">{student.email}</td>
                         <td className="px-6 py-3">{student.mobile}</td>
+                      {(hasPermission('students','edit') || hasPermission('students','delete')) && (
                         <td className="px-6 py-3">
                           {hasPermission('students','edit') && (
                             <button
@@ -307,6 +310,7 @@ function StudentsPage({ token }) {
                             </button>
                           )}
                         </td>
+                      )}
                       </tr>
                     ))}
                   </tbody>
