@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useAuth } from '../AuthContext';
 
 function NotificationsPage({ token }){
   const [items,setItems]=useState([]);
@@ -9,6 +10,8 @@ function NotificationsPage({ token }){
   const [formData,setFormData]=useState({recipient_role:'all',recipient_id:'',type:'general',message:'',channel:'in-app',send_date:''});
 
   useEffect(()=>{ load(); },[]);
+
+  const { hasPermission } = useAuth();
 
   async function load(){ setLoading(true); setError(''); try{ const r=await fetch('/api/notifications',{headers:{Authorization:`Bearer ${token}`}}); if(!r.ok) throw new Error('Failed to load notifications'); setItems((await r.json()).data||[]); }catch(e){ setError(e.message);} finally{ setLoading(false);} }
 
@@ -25,7 +28,9 @@ function NotificationsPage({ token }){
       <div className="mx-auto max-w-7xl">
         <div className="mb-8 flex items-center justify-between gap-4">
           <h1 className="text-3xl font-semibold">Notifications</h1>
-          <button onClick={()=>{ resetForm(); setShow(!show); }} className="rounded-2xl bg-cyan-500 px-4 py-2 text-slate-950 font-semibold transition hover:bg-cyan-400">{show?'Cancel':'Create'}</button>
+          {hasPermission('notifications','create') && (
+            <button onClick={()=>{ resetForm(); setShow(!show); }} className="rounded-2xl bg-cyan-500 px-4 py-2 text-slate-950 font-semibold transition hover:bg-cyan-400">{show?'Cancel':'Create'}</button>
+          )}
         </div>
 
         {error && <div className="mb-6 rounded-2xl bg-red-500/10 px-4 py-3 text-sm text-red-200">{error}</div>}
@@ -41,7 +46,7 @@ function NotificationsPage({ token }){
               <input type="date" value={formData.send_date} onChange={e=>setFormData({...formData,send_date:e.target.value})} className="rounded-2xl border border-slate-700 bg-slate-950 px-4 py-2 text-slate-100" />
             </div>
             <div className="flex gap-3">
-              <button type="submit" className="flex-1 rounded-2xl bg-cyan-500 px-4 py-2 text-slate-950 font-semibold transition hover:bg-cyan-400">{editingId?'Update':'Send'}</button>
+              <button type="submit" disabled={!hasPermission('notifications', editingId ? 'edit' : 'create')} className="flex-1 rounded-2xl bg-cyan-500 px-4 py-2 text-slate-950 font-semibold transition hover:bg-cyan-400">{editingId?'Update':'Send'}</button>
               <button type="button" onClick={resetForm} className="flex-1 rounded-2xl border border-slate-700 px-4 py-2 text-slate-100 transition hover:bg-slate-800">Cancel</button>
             </div>
           </form>
@@ -56,7 +61,7 @@ function NotificationsPage({ token }){
                 <thead>
                   <tr className="border-b border-slate-800"><th className="px-6 py-3 text-left font-semibold">Message</th><th className="px-6 py-3 text-left font-semibold">Role</th><th className="px-6 py-3 text-left font-semibold">Date</th><th className="px-6 py-3 text-left font-semibold">Actions</th></tr>
                 </thead>
-                <tbody>{items.map(n=>(<tr key={n.id} className="border-b border-slate-800 hover:bg-slate-800/50"><td className="px-6 py-3 font-medium">{n.message}</td><td className="px-6 py-3">{n.recipient_role}</td><td className="px-6 py-3">{n.send_date}</td><td className="px-6 py-3">{!n.is_read && <button onClick={()=>handleMarkRead(n.id)} className="mr-2 rounded-lg bg-emerald-600 px-3 py-1 text-xs text-white hover:bg-emerald-500">Mark Read</button>}<button onClick={()=>handleEdit(n)} className="mr-2 rounded-lg bg-blue-600 px-3 py-1 text-xs text-white hover:bg-blue-500">Edit</button><button onClick={()=>handleDelete(n.id)} className="rounded-lg bg-red-600 px-3 py-1 text-xs text-white hover:bg-red-500">Delete</button></td></tr>))}</tbody>
+                <tbody>{items.map(n=>(<tr key={n.id} className="border-b border-slate-800 hover:bg-slate-800/50"><td className="px-6 py-3 font-medium">{n.message}</td><td className="px-6 py-3">{n.recipient_role}</td><td className="px-6 py-3">{n.send_date}</td><td className="px-6 py-3">{!n.is_read && hasPermission('notifications','edit') && <button onClick={()=>handleMarkRead(n.id)} className="mr-2 rounded-lg bg-emerald-600 px-3 py-1 text-xs text-white hover:bg-emerald-500">Mark Read</button>}{hasPermission('notifications','edit') && <button onClick={()=>handleEdit(n)} className="mr-2 rounded-lg bg-blue-600 px-3 py-1 text-xs text-white hover:bg-blue-500">Edit</button>}{hasPermission('notifications','delete') && <button onClick={()=>handleDelete(n.id)} className="rounded-lg bg-red-600 px-3 py-1 text-xs text-white hover:bg-red-500">Delete</button>}</td></tr>))}</tbody>
               </table>
             )}
           </div>

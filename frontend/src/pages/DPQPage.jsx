@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useAuth } from '../AuthContext';
 
 function DPQPage({ token }){
   const [items,setItems]=useState([]);
@@ -10,6 +11,8 @@ function DPQPage({ token }){
   const [show,setShow]=useState(false); const [editingId,setEditingId]=useState(null);
 
   useEffect(()=>{ load(); loadMeta(); },[]);
+
+  const { hasPermission } = useAuth();
 
   async function load(){ setLoading(true); setError(''); try{ const r=await fetch('/api/dpq',{headers:{Authorization:`Bearer ${token}`}}); if(!r.ok) throw new Error('Failed to load DPQ'); setItems((await r.json()).data||[]); }catch(e){ setError(e.message);} finally{ setLoading(false);} }
 
@@ -28,7 +31,9 @@ function DPQPage({ token }){
       <div className="mx-auto max-w-7xl">
         <div className="mb-8 flex items-center justify-between gap-4">
           <h1 className="text-3xl font-semibold">Daily Practice Questions (DPQ)</h1>
-          <button onClick={()=>{ resetForm(); setShow(!show); }} className="rounded-2xl bg-cyan-500 px-4 py-2 text-slate-950 font-semibold transition hover:bg-cyan-400">{show?'Cancel':'Add DPQ'}</button>
+          {hasPermission('dpq','create') && (
+            <button onClick={()=>{ resetForm(); setShow(!show); }} className="rounded-2xl bg-cyan-500 px-4 py-2 text-slate-950 font-semibold transition hover:bg-cyan-400">{show?'Cancel':'Add DPQ'}</button>
+          )}
         </div>
 
         {error && <div className="mb-6 rounded-2xl bg-red-500/10 px-4 py-3 text-sm text-red-200">{error}</div>}
@@ -43,7 +48,7 @@ function DPQPage({ token }){
               <textarea placeholder="Description" value={formData.description} onChange={e=>setFormData({...formData,description:e.target.value})} className="rounded-2xl border border-slate-700 bg-slate-950 px-4 py-2 text-slate-100 md:col-span-2" />
             </div>
             <div className="flex gap-3">
-              <button type="submit" className="flex-1 rounded-2xl bg-cyan-500 px-4 py-2 text-slate-950 font-semibold transition hover:bg-cyan-400">{editingId?'Update DPQ':'Create DPQ'}</button>
+              <button type="submit" disabled={!hasPermission('dpq', editingId ? 'edit' : 'create')} className="flex-1 rounded-2xl bg-cyan-500 px-4 py-2 text-slate-950 font-semibold transition hover:bg-cyan-400">{editingId?'Update DPQ':'Create DPQ'}</button>
               <button type="button" onClick={resetForm} className="flex-1 rounded-2xl border border-slate-700 px-4 py-2 text-slate-100 transition hover:bg-slate-800">Cancel</button>
             </div>
           </form>
@@ -70,8 +75,8 @@ function DPQPage({ token }){
                       <td className="px-6 py-3">{d.class_name}</td>
                       <td className="px-6 py-3">{d.publish_date}</td>
                       <td className="px-6 py-3">
-                        <button onClick={()=>handleEdit(d)} className="mr-2 rounded-lg bg-blue-600 px-3 py-1 text-xs text-white hover:bg-blue-500">Edit</button>
-                        <button onClick={()=>handleDelete(d.id)} className="rounded-lg bg-red-600 px-3 py-1 text-xs text-white hover:bg-red-500">Delete</button>
+                        {hasPermission('dpq','edit') && <button onClick={()=>handleEdit(d)} className="mr-2 rounded-lg bg-blue-600 px-3 py-1 text-xs text-white hover:bg-blue-500">Edit</button>}
+                        {hasPermission('dpq','delete') && <button onClick={()=>handleDelete(d.id)} className="rounded-lg bg-red-600 px-3 py-1 text-xs text-white hover:bg-red-500">Delete</button>}
                       </td>
                     </tr>
                   ))}

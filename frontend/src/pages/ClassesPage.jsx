@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useAuth } from '../AuthContext';
 
 function ClassesPage({ token }) {
   const [classes, setClasses] = useState([]);
@@ -15,6 +16,12 @@ function ClassesPage({ token }) {
   useEffect(() => {
     loadClasses();
   }, []);
+
+  const { hasPermission } = useAuth();
+
+  if (!hasPermission('classes','view')) {
+    return <div className="p-6 text-slate-300">You do not have permission to view classes.</div>;
+  }
 
   async function loadClasses() {
     setLoading(true);
@@ -96,12 +103,14 @@ function ClassesPage({ token }) {
       <div className="mx-auto max-w-7xl">
         <div className="mb-8 flex items-center justify-between gap-4">
           <h1 className="text-3xl font-semibold">Classes Management</h1>
-          <button
-            onClick={() => { resetForm(); setShowForm(!showForm); }}
-            className="rounded-2xl bg-cyan-500 px-4 py-2 text-slate-950 font-semibold transition hover:bg-cyan-400"
-          >
-            {showForm ? 'Cancel' : 'Add Class'}
-          </button>
+          {hasPermission('classes','create') && (
+            <button
+              onClick={() => { resetForm(); setShowForm(!showForm); }}
+              className="rounded-2xl bg-cyan-500 px-4 py-2 text-slate-950 font-semibold transition hover:bg-cyan-400"
+            >
+              {showForm ? 'Cancel' : 'Add Class'}
+            </button>
+          )}
         </div>
 
         {error && <div className="mb-6 rounded-2xl bg-red-500/10 px-4 py-3 text-sm text-red-200">{error}</div>}
@@ -166,18 +175,22 @@ function ClassesPage({ token }) {
                   <p className="mb-2 text-sm text-slate-400">{cls.academic_year}</p>
                   <p className="mb-4 text-sm text-slate-300">{cls.description}</p>
                   <div className="flex gap-3">
-                    <button
-                      onClick={() => handleEdit(cls)}
-                      className="flex-1 rounded-lg bg-blue-600 px-3 py-1 text-xs text-white transition hover:bg-blue-500"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => handleDelete(cls.id)}
-                      className="flex-1 rounded-lg bg-red-600 px-3 py-1 text-xs text-white transition hover:bg-red-500"
-                    >
-                      Delete
-                    </button>
+                    {hasPermission('classes','edit') && (
+                      <button
+                        onClick={() => handleEdit(cls)}
+                        className="flex-1 rounded-lg bg-blue-600 px-3 py-1 text-xs text-white transition hover:bg-blue-500"
+                      >
+                        Edit
+                      </button>
+                    )}
+                    {hasPermission('classes','delete') && (
+                      <button
+                        onClick={() => handleDelete(cls.id)}
+                        className="flex-1 rounded-lg bg-red-600 px-3 py-1 text-xs text-white transition hover:bg-red-500"
+                      >
+                        Delete
+                      </button>
+                    )}
                   </div>
                 </div>
               ))

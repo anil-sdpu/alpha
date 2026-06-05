@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useAuth } from '../AuthContext';
 
 function StudentsPage({ token }) {
   const [students, setStudents] = useState([]);
@@ -26,6 +27,14 @@ function StudentsPage({ token }) {
     loadStudents();
     loadClasses();
   }, []);
+
+  const { role, hasPermission } = useAuth();
+
+  if (!hasPermission('students','view')) {
+    return (
+      <div className="p-6 text-slate-300">You do not have permission to view students.</div>
+    );
+  }
 
   async function loadStudents() {
     setLoading(true);
@@ -130,12 +139,14 @@ function StudentsPage({ token }) {
       <div className="mx-auto max-w-7xl">
         <div className="mb-8 flex items-center justify-between gap-4">
           <h1 className="text-3xl font-semibold">Students Management</h1>
-          <button
-            onClick={() => { resetForm(); setShowForm(!showForm); }}
-            className="rounded-2xl bg-cyan-500 px-4 py-2 text-slate-950 font-semibold transition hover:bg-cyan-400"
-          >
-            {showForm ? 'Cancel' : 'Add Student'}
-          </button>
+          {hasPermission('students','create') && (
+            <button
+              onClick={() => { resetForm(); setShowForm(!showForm); }}
+              className="rounded-2xl bg-cyan-500 px-4 py-2 text-slate-950 font-semibold transition hover:bg-cyan-400"
+            >
+              {showForm ? 'Cancel' : 'Add Student'}
+            </button>
+          )}
         </div>
 
         {error && <div className="mb-6 rounded-2xl bg-red-500/10 px-4 py-3 text-sm text-red-200">{error}</div>}
@@ -279,18 +290,22 @@ function StudentsPage({ token }) {
                         <td className="px-6 py-3">{student.email}</td>
                         <td className="px-6 py-3">{student.mobile}</td>
                         <td className="px-6 py-3">
-                          <button
-                            onClick={() => handleEdit(student)}
-                            className="mr-2 rounded-lg bg-blue-600 px-3 py-1 text-xs text-white hover:bg-blue-500"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => handleDelete(student.id)}
-                            className="rounded-lg bg-red-600 px-3 py-1 text-xs text-white hover:bg-red-500"
-                          >
-                            Delete
-                          </button>
+                          {hasPermission('students','edit') && (
+                            <button
+                              onClick={() => handleEdit(student)}
+                              className="mr-2 rounded-lg bg-blue-600 px-3 py-1 text-xs text-white hover:bg-blue-500"
+                            >
+                              Edit
+                            </button>
+                          )}
+                          {hasPermission('students','delete') && (
+                            <button
+                              onClick={() => handleDelete(student.id)}
+                              className="rounded-lg bg-red-600 px-3 py-1 text-xs text-white hover:bg-red-500"
+                            >
+                              Delete
+                            </button>
+                          )}
                         </td>
                       </tr>
                     ))}

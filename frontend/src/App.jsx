@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useAuth } from './AuthContext';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import StudentsPage from './pages/StudentsPage';
@@ -42,31 +43,36 @@ function App() {
       <aside className="w-64 border-r border-slate-800 bg-slate-900">
         <nav className="space-y-2 p-6">
           <h2 className="mb-4 text-lg font-semibold text-slate-100">Alpha Tuition</h2>
-          {[
-            { id: 'dashboard', label: 'Dashboard' },
-            { id: 'students', label: 'Students' },
-            { id: 'classes', label: 'Classes' },
-            { id: 'subjects', label: 'Subjects' },
-            { id: 'chapters', label: 'Chapters' },
-            { id: 'tests', label: 'Tests' },
-            { id: 'questions', label: 'Questions' },
-            { id: 'dpq', label: 'DPQ' },
-            { id: 'attendance', label: 'Attendance' },
-            { id: 'fees', label: 'Fees' },
-            { id: 'notifications', label: 'Notifications' }
-          ].map((item) => (
-            <button
-              key={item.id}
-              onClick={() => setCurrentPage(item.id)}
-              className={`w-full rounded-2xl px-4 py-2 text-left text-sm transition ${
-                currentPage === item.id
-                  ? 'bg-cyan-500/20 text-cyan-400'
-                  : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'
-              }`}
-            >
-              {item.label}
-            </button>
-          ))}
+          {(() => {
+            const { hasPermission } = useAuth();
+            const items = [
+              { id: 'dashboard', label: 'Dashboard', entity: null },
+              { id: 'students', label: 'Students', entity: 'students' },
+              { id: 'classes', label: 'Classes', entity: 'classes' },
+              { id: 'subjects', label: 'Subjects', entity: 'subjects' },
+              { id: 'chapters', label: 'Chapters', entity: 'chapters' },
+              { id: 'tests', label: 'Tests', entity: 'tests' },
+              { id: 'questions', label: 'Questions', entity: 'questions' },
+              { id: 'dpq', label: 'DPQ', entity: 'dpq' },
+              { id: 'attendance', label: 'Attendance', entity: 'attendance' },
+              { id: 'fees', label: 'Fees', entity: 'fees' },
+              { id: 'notifications', label: 'Notifications', entity: 'notifications' }
+            ];
+
+            return items.filter(i => !i.entity || hasPermission(i.entity, 'view')).map((item) => (
+              <button
+                key={item.id}
+                onClick={() => setCurrentPage(item.id)}
+                className={`w-full rounded-2xl px-4 py-2 text-left text-sm transition ${
+                  currentPage === item.id
+                    ? 'bg-cyan-500/20 text-cyan-400'
+                    : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'
+                }`}
+              >
+                {item.label}
+              </button>
+            ));
+          })()}
           <button
             onClick={handleLogout}
             className="mt-8 w-full rounded-2xl bg-red-600/20 px-4 py-2 text-left text-sm text-red-400 transition hover:bg-red-600/30"

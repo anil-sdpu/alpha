@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useAuth } from '../AuthContext';
 
 function SubjectsPage({ token }) {
   const [subjects, setSubjects] = useState([]);
@@ -18,6 +19,12 @@ function SubjectsPage({ token }) {
     loadSubjects();
     loadClasses();
   }, []);
+
+  const { hasPermission } = useAuth();
+
+  if (!hasPermission('subjects','view')) {
+    return <div className="p-6 text-slate-300">You do not have permission to view subjects.</div>;
+  }
 
   async function loadSubjects() {
     setLoading(true);
@@ -114,12 +121,14 @@ function SubjectsPage({ token }) {
       <div className="mx-auto max-w-7xl">
         <div className="mb-8 flex items-center justify-between gap-4">
           <h1 className="text-3xl font-semibold">Subjects Management</h1>
-          <button
-            onClick={() => { resetForm(); setShowForm(!showForm); }}
-            className="rounded-2xl bg-cyan-500 px-4 py-2 text-slate-950 font-semibold transition hover:bg-cyan-400"
-          >
-            {showForm ? 'Cancel' : 'Add Subject'}
-          </button>
+          {hasPermission('subjects','create') && (
+            <button
+              onClick={() => { resetForm(); setShowForm(!showForm); }}
+              className="rounded-2xl bg-cyan-500 px-4 py-2 text-slate-950 font-semibold transition hover:bg-cyan-400"
+            >
+              {showForm ? 'Cancel' : 'Add Subject'}
+            </button>
+          )}
         </div>
 
         {error && <div className="mb-6 rounded-2xl bg-red-500/10 px-4 py-3 text-sm text-red-200">{error}</div>}
@@ -205,18 +214,22 @@ function SubjectsPage({ token }) {
                       <td className="px-6 py-3">{subject.subject_code}</td>
                       <td className="px-6 py-3 text-slate-400">{subject.description}</td>
                       <td className="px-6 py-3">
-                        <button
-                          onClick={() => handleEdit(subject)}
-                          className="mr-2 rounded-lg bg-blue-600 px-3 py-1 text-xs text-white hover:bg-blue-500"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => handleDelete(subject.id)}
-                          className="rounded-lg bg-red-600 px-3 py-1 text-xs text-white hover:bg-red-500"
-                        >
-                          Delete
-                        </button>
+                        {hasPermission('subjects','edit') && (
+                          <button
+                            onClick={() => handleEdit(subject)}
+                            className="mr-2 rounded-lg bg-blue-600 px-3 py-1 text-xs text-white hover:bg-blue-500"
+                          >
+                            Edit
+                          </button>
+                        )}
+                        {hasPermission('subjects','delete') && (
+                          <button
+                            onClick={() => handleDelete(subject.id)}
+                            className="rounded-lg bg-red-600 px-3 py-1 text-xs text-white hover:bg-red-500"
+                          >
+                            Delete
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))}

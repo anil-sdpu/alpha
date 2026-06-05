@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useAuth } from '../AuthContext';
 
 function FeesPage({ token }){
   const [items,setItems]=useState([]);
@@ -9,6 +10,8 @@ function FeesPage({ token }){
   const [show,setShow]=useState(false); const [editingId,setEditingId]=useState(null);
 
   useEffect(()=>{ load(); loadMeta(); },[]);
+
+  const { hasPermission } = useAuth();
 
   async function load(){ setLoading(true); setError(''); try{ const r=await fetch('/api/fees',{headers:{Authorization:`Bearer ${token}`}}); if(!r.ok) throw new Error('Failed to load payments'); setItems((await r.json()).data||[]); }catch(e){ setError(e.message);} finally{ setLoading(false);} }
 
@@ -27,7 +30,9 @@ function FeesPage({ token }){
       <div className="mx-auto max-w-7xl">
         <div className="mb-8 flex items-center justify-between gap-4">
           <h1 className="text-3xl font-semibold">Fees</h1>
-          <button onClick={()=>{ resetForm(); setShow(!show); }} className="rounded-2xl bg-cyan-500 px-4 py-2 text-slate-950 font-semibold transition hover:bg-cyan-400">{show?'Cancel':'Add Payment'}</button>
+          {hasPermission('fees','create') && (
+            <button onClick={()=>{ resetForm(); setShow(!show); }} className="rounded-2xl bg-cyan-500 px-4 py-2 text-slate-950 font-semibold transition hover:bg-cyan-400">{show?'Cancel':'Add Payment'}</button>
+          )}
         </div>
 
         {error && <div className="mb-6 rounded-2xl bg-red-500/10 px-4 py-3 text-sm text-red-200">{error}</div>}
@@ -43,7 +48,7 @@ function FeesPage({ token }){
               <input type="text" placeholder="Remarks" value={formData.remarks} onChange={e=>setFormData({...formData,remarks:e.target.value})} className="rounded-2xl border border-slate-700 bg-slate-950 px-4 py-2 text-slate-100 md:col-span-2" />
             </div>
             <div className="flex gap-3">
-              <button type="submit" className="flex-1 rounded-2xl bg-cyan-500 px-4 py-2 text-slate-950 font-semibold transition hover:bg-cyan-400">{editingId?'Update':'Save'}</button>
+              <button type="submit" disabled={!hasPermission('fees', editingId ? 'edit' : 'create')} className="flex-1 rounded-2xl bg-cyan-500 px-4 py-2 text-slate-950 font-semibold transition hover:bg-cyan-400">{editingId?'Update':'Save'}</button>
               <button type="button" onClick={resetForm} className="flex-1 rounded-2xl border border-slate-700 px-4 py-2 text-slate-100 transition hover:bg-slate-800">Cancel</button>
             </div>
           </form>
@@ -58,7 +63,7 @@ function FeesPage({ token }){
                 <thead>
                   <tr className="border-b border-slate-800"><th className="px-6 py-3 text-left font-semibold">Student</th><th className="px-6 py-3 text-left font-semibold">Total</th><th className="px-6 py-3 text-left font-semibold">Paid</th><th className="px-6 py-3 text-left font-semibold">Due</th><th className="px-6 py-3 text-left font-semibold">Actions</th></tr>
                 </thead>
-                <tbody>{items.map(f=>(<tr key={f.id} className="border-b border-slate-800 hover:bg-slate-800/50"><td className="px-6 py-3 font-medium">{f.full_name}</td><td className="px-6 py-3">{f.total_fee}</td><td className="px-6 py-3">{f.paid_amount}</td><td className="px-6 py-3">{f.due_amount}</td><td className="px-6 py-3"><button onClick={()=>handleEdit(f)} className="mr-2 rounded-lg bg-blue-600 px-3 py-1 text-xs text-white hover:bg-blue-500">Edit</button><button onClick={()=>handleDelete(f.id)} className="rounded-lg bg-red-600 px-3 py-1 text-xs text-white hover:bg-red-500">Delete</button></td></tr>))}</tbody>
+                <tbody>{items.map(f=>(<tr key={f.id} className="border-b border-slate-800 hover:bg-slate-800/50"><td className="px-6 py-3 font-medium">{f.full_name}</td><td className="px-6 py-3">{f.total_fee}</td><td className="px-6 py-3">{f.paid_amount}</td><td className="px-6 py-3">{f.due_amount}</td><td className="px-6 py-3">{hasPermission('fees','edit') && <button onClick={()=>handleEdit(f)} className="mr-2 rounded-lg bg-blue-600 px-3 py-1 text-xs text-white hover:bg-blue-500">Edit</button>}{hasPermission('fees','delete') && <button onClick={()=>handleDelete(f.id)} className="rounded-lg bg-red-600 px-3 py-1 text-xs text-white hover:bg-red-500">Delete</button>}</td></tr>))}</tbody>
               </table>
             )}
           </div>

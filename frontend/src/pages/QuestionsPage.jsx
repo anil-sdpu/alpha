@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useAuth } from '../AuthContext';
 
 function QuestionsPage({ token }){
   const [items,setItems]=useState([]);
@@ -10,6 +11,8 @@ function QuestionsPage({ token }){
   const [show,setShow]=useState(false); const [editingId,setEditingId]=useState(null);
 
   useEffect(()=>{load(); loadMeta();},[]);
+
+  const { hasPermission } = useAuth();
 
   async function load(){ setLoading(true); setError(''); try{ const res=await fetch('/api/questions',{headers:{Authorization:`Bearer ${token}`}}); if(!res.ok) throw new Error('Failed to load questions'); setItems((await res.json()).data||[]); }catch(e){ setError(e.message);} finally{ setLoading(false);} }
 
@@ -32,7 +35,9 @@ function QuestionsPage({ token }){
       <div className="mx-auto max-w-7xl">
         <div className="mb-8 flex items-center justify-between gap-4">
           <h1 className="text-3xl font-semibold">Questions</h1>
-          <button onClick={()=>{ resetForm(); setShow(!show); }} className="rounded-2xl bg-cyan-500 px-4 py-2 text-slate-950 font-semibold transition hover:bg-cyan-400">{show?'Cancel':'Add Question'}</button>
+          {hasPermission('questions','create') && (
+            <button onClick={()=>{ resetForm(); setShow(!show); }} className="rounded-2xl bg-cyan-500 px-4 py-2 text-slate-950 font-semibold transition hover:bg-cyan-400">{show?'Cancel':'Add Question'}</button>
+          )}
         </div>
 
         {error && <div className="mb-6 rounded-2xl bg-red-500/10 px-4 py-3 text-sm text-red-200">{error}</div>}
@@ -51,7 +56,7 @@ function QuestionsPage({ token }){
               </div>)}
             </div>
             <div className="flex gap-3">
-              <button type="submit" className="flex-1 rounded-2xl bg-cyan-500 px-4 py-2 text-slate-950 font-semibold transition hover:bg-cyan-400">{editingId?'Update':'Create'}</button>
+              <button type="submit" disabled={!hasPermission('questions', editingId ? 'edit' : 'create')} className="flex-1 rounded-2xl bg-cyan-500 px-4 py-2 text-slate-950 font-semibold transition hover:bg-cyan-400">{editingId?'Update':'Create'}</button>
               <button type="button" onClick={resetForm} className="flex-1 rounded-2xl border border-slate-700 px-4 py-2 text-slate-100 transition hover:bg-slate-800">Cancel</button>
             </div>
           </form>
@@ -66,7 +71,7 @@ function QuestionsPage({ token }){
                 <thead>
                   <tr className="border-b border-slate-800"><th className="px-6 py-3 text-left font-semibold">Question</th><th className="px-6 py-3 text-left font-semibold">Type</th><th className="px-6 py-3 text-left font-semibold">Marks</th><th className="px-6 py-3 text-left font-semibold">Actions</th></tr>
                 </thead>
-                <tbody>{items.map(q=>(<tr key={q.id} className="border-b border-slate-800 hover:bg-slate-800/50"><td className="px-6 py-3 font-medium">{q.question_text}</td><td className="px-6 py-3">{q.question_type}</td><td className="px-6 py-3">{q.marks}</td><td className="px-6 py-3"><button onClick={()=>handleEdit(q)} className="mr-2 rounded-lg bg-blue-600 px-3 py-1 text-xs text-white hover:bg-blue-500">Edit</button><button onClick={()=>handleDelete(q.id)} className="rounded-lg bg-red-600 px-3 py-1 text-xs text-white hover:bg-red-500">Delete</button></td></tr>))}</tbody>
+                <tbody>{items.map(q=>(<tr key={q.id} className="border-b border-slate-800 hover:bg-slate-800/50"><td className="px-6 py-3 font-medium">{q.question_text}</td><td className="px-6 py-3">{q.question_type}</td><td className="px-6 py-3">{q.marks}</td><td className="px-6 py-3">{hasPermission('questions','edit') && <button onClick={()=>handleEdit(q)} className="mr-2 rounded-lg bg-blue-600 px-3 py-1 text-xs text-white hover:bg-blue-500">Edit</button>}{hasPermission('questions','delete') && <button onClick={()=>handleDelete(q.id)} className="rounded-lg bg-red-600 px-3 py-1 text-xs text-white hover:bg-red-500">Delete</button>}</td></tr>))}</tbody>
               </table>
             )}
           </div>

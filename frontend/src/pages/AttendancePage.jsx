@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useAuth } from '../AuthContext';
 
 function AttendancePage({ token }){
   const [items,setItems]=useState([]);
@@ -10,6 +11,8 @@ function AttendancePage({ token }){
   const [show,setShow]=useState(false); const [editingId,setEditingId]=useState(null);
 
   useEffect(()=>{ load(); loadMeta(); },[]);
+
+  const { hasPermission } = useAuth();
 
   async function load(){ setLoading(true); setError(''); try{ const r=await fetch('/api/attendance',{headers:{Authorization:`Bearer ${token}`}}); if(!r.ok) throw new Error('Failed to load attendance'); setItems((await r.json()).data||[]); }catch(e){ setError(e.message);} finally{ setLoading(false);} }
 
@@ -28,7 +31,9 @@ function AttendancePage({ token }){
       <div className="mx-auto max-w-7xl">
         <div className="mb-8 flex items-center justify-between gap-4">
           <h1 className="text-3xl font-semibold">Attendance</h1>
-          <button onClick={()=>{ resetForm(); setShow(!show); }} className="rounded-2xl bg-cyan-500 px-4 py-2 text-slate-950 font-semibold transition hover:bg-cyan-400">{show?'Cancel':'Mark Attendance'}</button>
+          {hasPermission('attendance','create') && (
+            <button onClick={()=>{ resetForm(); setShow(!show); }} className="rounded-2xl bg-cyan-500 px-4 py-2 text-slate-950 font-semibold transition hover:bg-cyan-400">{show?'Cancel':'Mark Attendance'}</button>
+          )}
         </div>
 
         {error && <div className="mb-6 rounded-2xl bg-red-500/10 px-4 py-3 text-sm text-red-200">{error}</div>}
@@ -43,7 +48,7 @@ function AttendancePage({ token }){
               <select value={formData.status} onChange={e=>setFormData({...formData,status:e.target.value})} className="rounded-2xl border border-slate-700 bg-slate-950 px-4 py-2 text-slate-100"><option value="present">Present</option><option value="absent">Absent</option><option value="leave">Leave</option></select>
             </div>
             <div className="flex gap-3">
-              <button type="submit" className="flex-1 rounded-2xl bg-cyan-500 px-4 py-2 text-slate-950 font-semibold transition hover:bg-cyan-400">{editingId?'Update':'Save'}</button>
+              <button type="submit" disabled={!hasPermission('attendance', editingId ? 'edit' : 'create')} className="flex-1 rounded-2xl bg-cyan-500 px-4 py-2 text-slate-950 font-semibold transition hover:bg-cyan-400">{editingId?'Update':'Save'}</button>
               <button type="button" onClick={resetForm} className="flex-1 rounded-2xl border border-slate-700 px-4 py-2 text-slate-100 transition hover:bg-slate-800">Cancel</button>
             </div>
           </form>
@@ -58,7 +63,7 @@ function AttendancePage({ token }){
                 <thead>
                   <tr className="border-b border-slate-800"><th className="px-6 py-3 text-left font-semibold">Student</th><th className="px-6 py-3 text-left font-semibold">Class</th><th className="px-6 py-3 text-left font-semibold">Date</th><th className="px-6 py-3 text-left font-semibold">Status</th><th className="px-6 py-3 text-left font-semibold">Actions</th></tr>
                 </thead>
-                <tbody>{items.map(a=>(<tr key={a.id} className="border-b border-slate-800 hover:bg-slate-800/50"><td className="px-6 py-3 font-medium">{a.full_name}</td><td className="px-6 py-3">{a.class_name}</td><td className="px-6 py-3">{a.attendance_date}</td><td className="px-6 py-3">{a.status}</td><td className="px-6 py-3"><button onClick={()=>handleEdit(a)} className="mr-2 rounded-lg bg-blue-600 px-3 py-1 text-xs text-white hover:bg-blue-500">Edit</button><button onClick={()=>handleDelete(a.id)} className="rounded-lg bg-red-600 px-3 py-1 text-xs text-white hover:bg-red-500">Delete</button></td></tr>))}</tbody>
+                <tbody>{items.map(a=>(<tr key={a.id} className="border-b border-slate-800 hover:bg-slate-800/50"><td className="px-6 py-3 font-medium">{a.full_name}</td><td className="px-6 py-3">{a.class_name}</td><td className="px-6 py-3">{a.attendance_date}</td><td className="px-6 py-3">{a.status}</td><td className="px-6 py-3">{hasPermission('attendance','edit') && <button onClick={()=>handleEdit(a)} className="mr-2 rounded-lg bg-blue-600 px-3 py-1 text-xs text-white hover:bg-blue-500">Edit</button>}{hasPermission('attendance','delete') && <button onClick={()=>handleDelete(a.id)} className="rounded-lg bg-red-600 px-3 py-1 text-xs text-white hover:bg-red-500">Delete</button>}</td></tr>))}</tbody>
               </table>
             )}
           </div>
