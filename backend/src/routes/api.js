@@ -9,6 +9,8 @@ const path = require('path');
 const fs = require('fs');
 const PDFDocument = require('pdfkit');
 const nodemailer = require('nodemailer');
+const pdfParse = require('pdf-parse');
+const { createWorker } = require('tesseract.js');
 
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'change-me';
@@ -45,7 +47,7 @@ router.get('/profile', authenticate, async (req, res) => {
 
 router.get('/students', authenticate, requirePermission('students','view'), async (req, res) => {
   try {
-    const [rows] = await pool.query('SELECT s.id, s.full_name, s.gender, s.mobile, s.email, c.class_name FROM students s LEFT JOIN classes c ON s.class_id = c.id LIMIT 50');
+    const [rows] = await pool.query('SELECT s.id, s.student_code, s.full_name, s.gender, s.parent_name, s.parent_contact AS parent_contact_1, s.parent_contact_2, s.email, c.class_name, s.mobile FROM students s LEFT JOIN classes c ON s.class_id = c.id LIMIT 50');
     res.json({ data: rows });
   } catch (error) {
     console.error(error);
@@ -55,7 +57,7 @@ router.get('/students', authenticate, requirePermission('students','view'), asyn
 
 router.get('/classes', authenticate, requirePermission('classes','view'), async (req, res) => {
   try {
-    const [rows] = await pool.query('SELECT id, class_name, academic_year, description FROM classes LIMIT 50');
+    const [rows] = await pool.query('SELECT c.id, c.class_name, c.academic_year, c.description, (SELECT COUNT(*) FROM students s WHERE s.class_id = c.id) AS student_count, (SELECT COUNT(*) FROM chapters ch JOIN subjects sb ON ch.subject_id = sb.id WHERE sb.class_id = c.id) AS chapters_count FROM classes c LIMIT 50');
     res.json({ data: rows });
   } catch (error) {
     console.error(error);
@@ -65,7 +67,15 @@ router.get('/classes', authenticate, requirePermission('classes','view'), async 
 
 router.get('/subjects', authenticate, requirePermission('subjects','view'), async (req, res) => {
   try {
-    const [rows] = await pool.query('SELECT id, subject_name, subject_code, description FROM subjects LIMIT 50');
+    const classId = req.query.class_id || null;
+    let rows;
+    if (classId) {
+      const [r] = await pool.query('SELECT id, subject_name, subject_code, description, class_id, (SELECT COUNT(*) FROM chapters ch WHERE ch.subject_id = subjects.id) AS chapters_count FROM subjects WHERE class_id = ? LIMIT 200', [classId]);
+      rows = r;
+    } else {
+      const [r] = await pool.query('SELECT id, subject_name, subject_code, description, class_id, (SELECT COUNT(*) FROM chapters ch WHERE ch.subject_id = subjects.id) AS chapters_count FROM subjects LIMIT 500');
+      rows = r;
+    }
     res.json({ data: rows });
   } catch (error) {
     console.error(error);
@@ -159,27 +169,50 @@ router.get('/students/:id', authenticate, requirePermission('students','view'), 
 });
 
 router.post('/students', authenticate, requirePermission('students','create'), async (req, res) => {
-  const { full_name, gender, dob, mobile, parent_name, parent_contact, address, email, admission_date, class_id, section, status } = req.body;
+  const { full_name, gender, dob, mobile, parent_name, parent_contact_1, parent_contact_2, address, email, admission_date, class_id, section, status, student_code } = req.body;
   if (!full_name) return res.status(400).json({ error: 'full_name required' });
-  try {
-    const [result] = await pool.query(
-      'INSERT INTO students (full_name, gender, dob, mobile, parent_name, parent_contact, address, email, admission_date, class_id, section, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [full_name, gender, dob, mobile, parent_name, parent_contact, address, email, admission_date, class_id, section, status]
-    );
-    res.json({ id: result.insertId });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Unable to create student' });
+
+  // Generate a compact student_code; retry if duplicate
+  function genStudentCode() {
+    const t = Date.now().toString(36).toUpperCase();
+    const r = Math.floor(Math.random() * 900 + 100).toString(36).toUpperCase();
+    return (`S${t}${r}`).slice(0, 32);
   }
+
+  let attempts = 0;
+  const maxAttempts = 5;
+  let lastErr = null;
+  while (attempts < maxAttempts) {
+    attempts += 1;
+    const codeToUse = student_code || genStudentCode();
+    try {
+      const [result] = await pool.query(
+        'INSERT INTO students (student_code, full_name, gender, dob, mobile, parent_name, parent_contact, parent_contact_2, address, email, admission_date, class_id, section, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [codeToUse, full_name || null, gender || null, dob || null, mobile || null, parent_name || null, parent_contact_1 || null, parent_contact_2 || null, address || null, email || null, admission_date || null, class_id || null, section || null, status || 'active']
+      );
+      return res.json({ id: result.insertId, student_code: codeToUse });
+    } catch (err) {
+      lastErr = err;
+      if (err && err.code === 'ER_DUP_ENTRY') {
+        // collision on student_code, retry
+        continue;
+      }
+      console.error(err);
+      return res.status(500).json({ error: 'Unable to create student' });
+    }
+  }
+
+  console.error('create student failed after retries', lastErr && lastErr.message);
+  res.status(500).json({ error: 'Unable to create student after retries' });
 });
 
 router.put('/students/:id', authenticate, requirePermission('students','edit'), async (req, res) => {
   const { id } = req.params;
-  const { full_name, gender, dob, mobile, parent_name, parent_contact, address, email, admission_date, class_id, section } = req.body;
+  const { full_name, gender, dob, mobile, parent_name, parent_contact_1, parent_contact_2, address, email, admission_date, class_id, section } = req.body;
   try {
     await pool.query(
-      'UPDATE students SET full_name = ?, gender = ?, dob = ?, mobile = ?, parent_name = ?, parent_contact = ?, address = ?, email = ?, admission_date = ?, class_id = ?, section = ? WHERE id = ?',
-      [full_name, gender, dob, mobile, parent_name, parent_contact, address, email, admission_date, class_id, section, id]
+      'UPDATE students SET full_name = ?, gender = ?, dob = ?, mobile = ?, parent_name = ?, parent_contact = ?, parent_contact_2 = ?, address = ?, email = ?, admission_date = ?, class_id = ?, section = ? WHERE id = ?',
+      [full_name, gender, dob, mobile || null, parent_name || null, parent_contact_1 || null, parent_contact_2 || null, address || null, email || null, admission_date || null, class_id || null, section || null, id]
     );
     res.json({ ok: true });
   } catch (err) {
@@ -202,7 +235,27 @@ router.delete('/students/:id', authenticate, requirePermission('students','delet
 // Chapters CRUD
 router.get('/chapters', authenticate, requirePermission('chapters','view'), async (req, res) => {
   try {
-    const [rows] = await pool.query('SELECT ch.id, ch.title, ch.chapter_number, ch.status, s.subject_name FROM chapters ch LEFT JOIN subjects s ON ch.subject_id = s.id LIMIT 200');
+    const classId = req.query.class_id || null;
+    const subjectId = req.query.subject_id || null;
+    let rows;
+    if (subjectId) {
+      const [r] = await pool.query(
+        'SELECT ch.id, ch.title, ch.chapter_number, ch.status, s.id AS subject_id, s.subject_name, s.class_id, c.class_name FROM chapters ch LEFT JOIN subjects s ON ch.subject_id = s.id LEFT JOIN classes c ON s.class_id = c.id WHERE s.id = ? ORDER BY ch.chapter_number ASC LIMIT 1000',
+        [subjectId]
+      );
+      rows = r;
+    } else if (classId) {
+      const [r] = await pool.query(
+        'SELECT ch.id, ch.title, ch.chapter_number, ch.status, s.id AS subject_id, s.subject_name, s.class_id, c.class_name FROM chapters ch LEFT JOIN subjects s ON ch.subject_id = s.id LEFT JOIN classes c ON s.class_id = c.id WHERE c.id = ? ORDER BY ch.chapter_number ASC LIMIT 1000',
+        [classId]
+      );
+      rows = r;
+    } else {
+      const [r] = await pool.query(
+        'SELECT ch.id, ch.title, ch.chapter_number, ch.status, s.id AS subject_id, s.subject_name, s.class_id, c.class_name FROM chapters ch LEFT JOIN subjects s ON ch.subject_id = s.id LEFT JOIN classes c ON s.class_id = c.id ORDER BY c.class_name, ch.chapter_number ASC LIMIT 200'
+      );
+      rows = r;
+    }
     res.json({ data: rows });
   } catch (err) {
     console.error(err);
@@ -210,10 +263,30 @@ router.get('/chapters', authenticate, requirePermission('chapters','view'), asyn
   }
 });
 
+// Debug: list chapters joined with subjects and classes
+// NOTE: intentionally exposed without authentication for local debugging only. Remove before production.
+router.get('/debug/chapters-map', async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      'SELECT ch.id, ch.chapter_number, ch.title, ch.subject_id, s.subject_name, s.class_id, c.class_name FROM chapters ch LEFT JOIN subjects s ON ch.subject_id = s.id LEFT JOIN classes c ON s.class_id = c.id ORDER BY c.id, s.id, ch.chapter_number LIMIT 1000'
+    );
+    res.json({ data: rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Unable to fetch debug chapters map' });
+  }
+});
+
 router.post('/chapters', authenticate, requirePermission('chapters','create'), async (req, res) => {
-  const { subject_id, chapter_number, title, notes_path, status } = req.body;
+  const { subject_id, chapter_number, title, notes_path, status, class_id } = req.body;
   if (!subject_id || !title) return res.status(400).json({ error: 'subject_id and title required' });
   try {
+    // validate subject exists and optionally matches provided class_id
+    const [subs] = await pool.query('SELECT id, class_id FROM subjects WHERE id = ? LIMIT 1', [subject_id]);
+    if (!subs[0]) return res.status(400).json({ error: 'Invalid subject_id' });
+    if (class_id && subs[0].class_id && String(subs[0].class_id) !== String(class_id)) {
+      return res.status(400).json({ error: 'subject does not belong to the provided class' });
+    }
     const [result] = await pool.query('INSERT INTO chapters (subject_id, chapter_number, title, notes_path, status) VALUES (?, ?, ?, ?, ?)', [subject_id, chapter_number, title, notes_path, status || 'published']);
     res.json({ id: result.insertId });
   } catch (err) {
@@ -224,8 +297,14 @@ router.post('/chapters', authenticate, requirePermission('chapters','create'), a
 
 router.put('/chapters/:id', authenticate, requirePermission('chapters','edit'), async (req, res) => {
   const { id } = req.params;
-  const { subject_id, chapter_number, title, notes_path, status } = req.body;
+  const { subject_id, chapter_number, title, notes_path, status, class_id } = req.body;
   try {
+    // validate subject
+    const [subs] = await pool.query('SELECT id, class_id FROM subjects WHERE id = ? LIMIT 1', [subject_id]);
+    if (!subs[0]) return res.status(400).json({ error: 'Invalid subject_id' });
+    if (class_id && subs[0].class_id && String(subs[0].class_id) !== String(class_id)) {
+      return res.status(400).json({ error: 'subject does not belong to the provided class' });
+    }
     await pool.query('UPDATE chapters SET subject_id = ?, chapter_number = ?, title = ?, notes_path = ?, status = ? WHERE id = ?', [subject_id, chapter_number, title, notes_path, status, id]);
     res.json({ ok: true });
   } catch (err) {
@@ -393,6 +472,99 @@ router.post('/upload/question_paper', authenticate, requirePermission('tests','c
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Upload failed' });
+  }
+});
+
+// Upload a PDF or image containing questions and attempt to import them as questions
+router.post('/upload/questions', authenticate, requirePermission('questions','create'), upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+    const filePath = req.file.path;
+    const mime = req.file.mimetype || '';
+    let text = '';
+
+    if (mime === 'application/pdf' || filePath.toLowerCase().endsWith('.pdf')) {
+      const dataBuffer = fs.readFileSync(filePath);
+      try {
+        const data = await pdfParse(dataBuffer);
+        text = data && data.text ? data.text : '';
+      } catch (e) {
+        console.error('PDF parse failed', e.message || e);
+      }
+    } else if (mime.startsWith('image/') || /\.(png|jpg|jpeg|tiff)$/i.test(filePath)) {
+      // OCR via tesseract
+      const worker = createWorker();
+      try {
+        await worker.load();
+        await worker.loadLanguage('eng');
+        await worker.initialize('eng');
+        const { data } = await worker.recognize(filePath);
+        text = data && data.text ? data.text : '';
+      } catch (e) {
+        console.error('OCR failed', e.message || e);
+      } finally {
+        try { await worker.terminate(); } catch (e) {}
+      }
+    } else {
+      // unknown type - return saved path
+      return res.json({ path: filePath.replace(/\\/g, '/'), message: 'File saved; unsupported file type for automatic import' });
+    }
+
+    if (!text || !text.trim()) return res.status(200).json({ path: filePath.replace(/\\/g, '/'), message: 'No text extracted; file saved' });
+
+    // naive parsing: split by lines and detect numbered questions
+    const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    const questions = [];
+    let current = null;
+    for (const line of lines) {
+      if (/^(?:\d+\.|Q\d+[:\)]?)/i.test(line)) {
+        if (current) questions.push(current);
+        current = { raw: line.replace(/^(?:\d+\.|Q\d+[:\)]?)/i, '').trim(), lines: [] };
+      } else if (current) {
+        current.lines.push(line);
+      } else {
+        // orphan lines: start a new question if ends with question mark
+        if (/[?]$/.test(line)) {
+          questions.push({ raw: line, lines: [] });
+        }
+      }
+    }
+    if (current) questions.push(current);
+
+    // if still empty, try splitting by double newlines into paragraphs
+    if (questions.length === 0) {
+      const paras = text.split(/\n\s*\n/).map(p => p.trim()).filter(Boolean);
+      for (const p of paras) questions.push({ raw: p, lines: [] });
+    }
+
+    // map parsed question candidates to DB inserts
+    const inserted = [];
+    for (const q of questions) {
+      const qtext = [q.raw].concat(q.lines || []).join(' ').trim();
+      if (!qtext) continue;
+      // detect options (A. B. C. or a) b) )
+      const optionLines = (q.lines || []).filter(l => /^[A-Da-d][\.\)]/.test(l) || /^\([a-dA-D]\)/.test(l));
+      let options = null;
+      let qtype = 'short_answer';
+      if (optionLines.length >= 2) {
+        options = optionLines.map(l => l.replace(/^[A-Da-d][\.\)]\s*/, '').replace(/^\([a-dA-D]\)\s*/, '').trim());
+        qtype = 'mcq';
+      }
+      const subject_id = req.body.subject_id || null;
+      const chapter_id = req.body.chapter_id || null;
+      const marks = req.body.marks || 1;
+      try {
+        const [r] = await pool.query('INSERT INTO questions (subject_id, chapter_id, question_type, question_text, options, correct_answer, marks, difficulty, tags) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [subject_id, chapter_id, qtype, qtext, options ? JSON.stringify(options) : null, null, marks, 'medium', null]);
+        inserted.push({ id: r.insertId, question: qtext });
+      } catch (e) {
+        console.error('Insert question failed', e.message || e);
+      }
+    }
+
+    res.json({ path: filePath.replace(/\\/g, '/'), imported: inserted.length, questions: inserted.slice(0,10) });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Unable to import questions' });
   }
 });
 

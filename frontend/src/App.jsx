@@ -40,7 +40,8 @@ function App() {
 
   return (
     <div className="flex min-h-screen bg-slate-950">
-      <aside className="w-64 border-r border-slate-800 bg-slate-900">
+      {token && (
+        <aside className="w-64 border-r border-slate-800 bg-slate-900">
         <nav className="space-y-2 p-6">
           <h2 className="mb-4 text-lg font-semibold text-slate-100">Alpha Tuition</h2>
           {(() => {
@@ -50,9 +51,9 @@ function App() {
               { id: 'students', label: 'Students', entity: 'students' },
               { id: 'classes', label: 'Classes', entity: 'classes' },
               { id: 'subjects', label: 'Subjects', entity: 'subjects' },
-              { id: 'chapters', label: 'Chapters', entity: 'chapters' },
+              { id: 'chapters', label: 'Chapters List', entity: 'chapters' },
               { id: 'tests', label: 'Tests', entity: 'tests' },
-              { id: 'questions', label: 'Questions', entity: 'questions' },
+              { id: 'questions', label: 'Practice', entity: 'questions' },
               { id: 'dpq', label: 'DPQ', entity: 'dpq' },
               { id: 'attendance', label: 'Attendance', entity: 'attendance' },
               { id: 'fees', label: 'Fees', entity: 'fees' },
@@ -91,7 +92,8 @@ function App() {
             Logout
           </button>
         </nav>
-      </aside>
+        </aside>
+      )}
 
       <main className="flex-1">
         {!token ? (

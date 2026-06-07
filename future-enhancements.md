@@ -92,3 +92,9 @@
 Would you like me to:  
 - Implement server-side RBAC middleware and apply it to routes now?  
 - Create a prioritized sprint (Jira-style) with tasks and estimates?
+
+
+
+
+Issues:
+In DPQ section, include import pdf or jpg file option

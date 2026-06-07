@@ -173,6 +173,7 @@ function ClassesPage({ token }) {
                 <div key={cls.id} className="rounded-3xl border border-slate-800 bg-slate-900 p-6 shadow-xl">
                   <h3 className="mb-2 text-xl font-semibold">{cls.class_name}</h3>
                   <p className="mb-2 text-sm text-slate-400">{cls.academic_year}</p>
+                  <p className="mb-2 text-sm text-slate-300">Students: {typeof cls.student_count !== 'undefined' ? cls.student_count : '-'}</p>
                   <p className="mb-4 text-sm text-slate-300">{cls.description}</p>
                   <div className="flex gap-3">
                     {hasPermission('classes','edit') && (

@@ -149,6 +149,7 @@ function SubjectsPage({ token }) {
                 ))}
               </select>
               <input
+                list="subject-suggestions"
                 type="text"
                 placeholder="Subject Name"
                 value={formData.subject_name}
@@ -156,6 +157,11 @@ function SubjectsPage({ token }) {
                 className="rounded-2xl border border-slate-700 bg-slate-950 px-4 py-2 text-slate-100"
                 required
               />
+              <datalist id="subject-suggestions">
+                <option value="Mathematics" />
+                <option value="Physics" />
+                <option value="Chemistry" />
+              </datalist>
 
               <input
                 type="text"

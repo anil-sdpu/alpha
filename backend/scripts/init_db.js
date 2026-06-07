@@ -56,9 +56,9 @@ async function run() {
     const [strows] = await conn.query('SELECT id FROM students WHERE full_name = ? LIMIT 1', ['Test Student']);
     if (strows.length === 0) {
       await conn.query(
-        `INSERT INTO students (full_name, gender, dob, mobile, parent_name, parent_contact, address, email, admission_date, class_id, section, status)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        ['Test Student', 'male', '2011-05-12', '9999999999', 'Parent Name', '8888888888', '123 Test St', 'student1@alpha.local', '2025-05-01', classId, 'A', 'active']
+        `INSERT INTO students (full_name, gender, dob, mobile, parent_name, parent_contact, parent_contact_2, address, email, admission_date, class_id, section, status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ['Test Student', 'male', '2011-05-12', '9999999999', 'Parent Name', '8888888888', '7777777777', '123 Test St', 'student1@alpha.local', '2025-05-01', classId, 'A', 'active']
       );
       console.log('Inserted sample student');
     }

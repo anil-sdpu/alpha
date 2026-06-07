@@ -12,9 +12,9 @@ function StudentsPage({ token }) {
     full_name: '',
     gender: '',
     dob: '',
-    mobile: '',
     parent_name: '',
-    parent_contact: '',
+    parent_contact_1: '',
+    parent_contact_2: '',
     address: '',
     email: '',
     admission_date: '',
@@ -67,10 +67,44 @@ function StudentsPage({ token }) {
     }
   }
 
-  function handleEdit(student) {
+  async function handleEdit(student) {
     setEditingId(student.id);
-    setFormData(student);
+    setError('');
     setShowForm(true);
+    try {
+      const res = await fetch(`/api/students/${student.id}`, { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) {
+        setError('Failed to load student details');
+        return;
+      }
+      const j = await res.json();
+      const s = j.data || {};
+      function normalizeDate(v){
+        if(!v) return '';
+        if(/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
+        if(typeof v === 'string' && v.length >= 10 && v[4]==='-' && v[7]==='-') return v.slice(0,10);
+        try{ const d=new Date(v); if(!isNaN(d)) return d.toISOString().slice(0,10); }catch(e){}
+        return '';
+      }
+
+      setFormData({
+        full_name: s.full_name || '',
+        gender: s.gender || '',
+        dob: normalizeDate(s.dob),
+        parent_name: s.parent_name || '',
+        parent_contact_1: s.parent_contact || s.parent_contact_1 || s.mobile || '',
+        parent_contact_2: s.parent_contact_2 || '',
+        address: s.address || '',
+        email: s.email || '',
+        admission_date: normalizeDate(s.admission_date),
+        class_id: s.class_id || '',
+        section: s.section || '',
+        status: s.status || 'active'
+      });
+    } catch (err) {
+      console.error('Edit load failed', err);
+      setError('Failed to load student details');
+    }
   }
 
   async function handleSubmit(e) {
@@ -120,9 +154,9 @@ function StudentsPage({ token }) {
       full_name: '',
       gender: '',
       dob: '',
-      mobile: '',
       parent_name: '',
-      parent_contact: '',
+      parent_contact_1: '',
+      parent_contact_2: '',
       address: '',
       email: '',
       admission_date: '',
@@ -162,7 +196,6 @@ function StudentsPage({ token }) {
                 value={formData.full_name}
                 onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
                 className="rounded-2xl border border-slate-700 bg-slate-950 px-4 py-2 text-slate-100"
-                required
               />
               <select
                 value={formData.gender}
@@ -184,9 +217,9 @@ function StudentsPage({ token }) {
               />
               <input
                 type="tel"
-                placeholder="Mobile"
-                value={formData.mobile}
-                onChange={(e) => setFormData({ ...formData, mobile: e.target.value })}
+                placeholder="Parent Contact Number 1"
+                value={formData.parent_contact_1}
+                onChange={(e) => setFormData({ ...formData, parent_contact_1: e.target.value })}
                 className="rounded-2xl border border-slate-700 bg-slate-950 px-4 py-2 text-slate-100"
               />
 
@@ -199,9 +232,9 @@ function StudentsPage({ token }) {
               />
               <input
                 type="tel"
-                placeholder="Parent Contact"
-                value={formData.parent_contact}
-                onChange={(e) => setFormData({ ...formData, parent_contact: e.target.value })}
+                placeholder="Parent Contact Number 2"
+                value={formData.parent_contact_2}
+                onChange={(e) => setFormData({ ...formData, parent_contact_2: e.target.value })}
                 className="rounded-2xl border border-slate-700 bg-slate-950 px-4 py-2 text-slate-100"
               />
 
@@ -214,7 +247,7 @@ function StudentsPage({ token }) {
               />
               <input
                 type="date"
-                placeholder="Admission Date"
+                placeholder="Date of Joining ACC"
                 value={formData.admission_date}
                 onChange={(e) => setFormData({ ...formData, admission_date: e.target.value })}
                 className="rounded-2xl border border-slate-700 bg-slate-950 px-4 py-2 text-slate-100"
@@ -278,7 +311,8 @@ function StudentsPage({ token }) {
                       <th className="px-6 py-3 text-left font-semibold">Name</th>
                       <th className="px-6 py-3 text-left font-semibold">Class</th>
                       <th className="px-6 py-3 text-left font-semibold">Email</th>
-                      <th className="px-6 py-3 text-left font-semibold">Mobile</th>
+                      <th className="px-6 py-3 text-left font-semibold">Parent Contact 1</th>
+                      <th className="px-6 py-3 text-left font-semibold">Parent Contact 2</th>
                       {(hasPermission('students','edit') || hasPermission('students','delete')) && (
                         <th className="px-6 py-3 text-left font-semibold">Actions</th>
                       )}
@@ -290,7 +324,8 @@ function StudentsPage({ token }) {
                         <td className="px-6 py-3">{student.full_name}</td>
                         <td className="px-6 py-3">{student.class_name || '-'}</td>
                         <td className="px-6 py-3">{student.email}</td>
-                        <td className="px-6 py-3">{student.mobile}</td>
+                        <td className="px-6 py-3">{student.parent_contact || student.parent_contact_1 || student.mobile || '-'}</td>
+                        <td className="px-6 py-3">{student.parent_contact_2 || '-'}</td>
                       {(hasPermission('students','edit') || hasPermission('students','delete')) && (
                         <td className="px-6 py-3">
                           {hasPermission('students','edit') && (

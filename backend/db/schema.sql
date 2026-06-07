@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS students (
   mobile VARCHAR(32),
   parent_name VARCHAR(255),
   parent_contact VARCHAR(64),
+  parent_contact_2 VARCHAR(64),
   address TEXT,
   email VARCHAR(255),
   admission_date DATE,

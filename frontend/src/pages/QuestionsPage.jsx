@@ -9,6 +9,10 @@ function QuestionsPage({ token }){
   const [error,setError]=useState('');
   const [formData,setFormData]=useState({subject_id:'',chapter_id:'',question_type:'mcq',question_text:'',options:[],correct_answer:'',marks:1,difficulty:'medium',tags:''});
   const [show,setShow]=useState(false); const [editingId,setEditingId]=useState(null);
+  const [importShow, setImportShow] = useState(false);
+  const [importFile, setImportFile] = useState(null);
+  const [importLoading, setImportLoading] = useState(false);
+  const [importError, setImportError] = useState('');
 
   useEffect(()=>{load(); loadMeta();},[]);
 
@@ -27,17 +31,32 @@ function QuestionsPage({ token }){
 
   function resetForm(){ setFormData({subject_id:'',chapter_id:'',question_type:'mcq',question_text:'',options:[],correct_answer:'',marks:1,difficulty:'medium',tags:''}); setEditingId(null); setShow(false); }
 
-  function handleEdit(q){ setEditingId(q.id); setFormData(q); setShow(true); }
+  function handleEdit(q){
+    const parsed = { ...q };
+    try {
+      parsed.options = q.options ? (typeof q.options === 'string' ? JSON.parse(q.options) : q.options) : [];
+    } catch (e) {
+      parsed.options = [];
+    }
+    setEditingId(q.id);
+    setFormData(parsed);
+    setShow(true);
+  }
   async function handleDelete(id){ if(!confirm('Delete question?')) return; setError(''); try{ const r=await fetch(`/api/questions/${id}`,{method:'DELETE',headers:{Authorization:`Bearer ${token}`}}); if(!r.ok) throw new Error('Failed to delete question'); load(); }catch(e){ setError(e.message);} }
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 p-6">
       <div className="mx-auto max-w-7xl">
-        <div className="mb-8 flex items-center justify-between gap-4">
-          <h1 className="text-3xl font-semibold">Questions</h1>
-          {hasPermission('questions','create') && (
-            <button onClick={()=>{ resetForm(); setShow(!show); }} className="rounded-2xl bg-cyan-500 px-4 py-2 text-slate-950 font-semibold transition hover:bg-cyan-400">{show?'Cancel':'Add Question'}</button>
-          )}
+          <div className="mb-8 flex items-center justify-between gap-4">
+          <h1 className="text-3xl font-semibold">Practice Questions</h1>
+          <div className="flex gap-2">
+            {hasPermission('questions','create') && (
+              <>
+                <button onClick={()=>{ resetForm(); setShow(!show); }} className="rounded-2xl bg-cyan-500 px-4 py-2 text-slate-950 font-semibold transition hover:bg-cyan-400">{show?'Cancel':'Add Question'}</button>
+                <button onClick={()=>{ setImportShow(!importShow); setImportError(''); setImportFile(null); }} className="rounded-2xl bg-emerald-500 px-4 py-2 text-slate-950 font-semibold transition hover:bg-emerald-400">{importShow?'Close Import':'Import Questions'}</button>
+              </>
+            )}
+          </div>
         </div>
 
         {error && <div className="mb-6 rounded-2xl bg-red-500/10 px-4 py-3 text-sm text-red-200">{error}</div>}
@@ -58,6 +77,23 @@ function QuestionsPage({ token }){
             <div className="flex gap-3">
               <button type="submit" disabled={!hasPermission('questions', editingId ? 'edit' : 'create')} className="flex-1 rounded-2xl bg-cyan-500 px-4 py-2 text-slate-950 font-semibold transition hover:bg-cyan-400">{editingId?'Update':'Create'}</button>
               <button type="button" onClick={resetForm} className="flex-1 rounded-2xl border border-slate-700 px-4 py-2 text-slate-100 transition hover:bg-slate-800">Cancel</button>
+            </div>
+          </form>
+        )}
+
+        {importShow && (
+          <form onSubmit={async (e)=>{
+            e.preventDefault(); if(!importFile){ setImportError('Select a file'); return; } setImportLoading(true); setImportError(''); try{ const fd=new FormData(); fd.append('file', importFile); fd.append('subject_id', formData.subject_id || ''); fd.append('chapter_id', formData.chapter_id || ''); const r=await fetch('/api/upload/questions',{method:'POST',headers:{Authorization:`Bearer ${token}`},body:fd}); if(!r.ok){ const j=await r.json().catch(()=>null); throw new Error((j&&j.error)?j.error:'Import failed'); } const j=await r.json(); alert(`Imported ${j.imported||0} questions`); setImportShow(false); load(); }catch(err){ setImportError(err.message);} finally{ setImportLoading(false); } }} className="mb-8 space-y-4 rounded-3xl border border-slate-800 bg-slate-900 p-6">
+            <h2 className="text-xl font-semibold">Import Questions from PDF/Image</h2>
+            {importError && <div className="rounded-2xl bg-red-500/10 px-4 py-3 text-sm text-red-200">{importError}</div>}
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <select value={formData.subject_id} onChange={e=>setFormData({...formData,subject_id:e.target.value})} className="rounded-2xl border border-slate-700 bg-slate-950 px-4 py-2 text-slate-100"><option value="">Subject (optional)</option>{subjects.map(s=> <option key={s.id} value={s.id}>{s.subject_name}</option>)}</select>
+              <select value={formData.chapter_id} onChange={e=>setFormData({...formData,chapter_id:e.target.value})} className="rounded-2xl border border-slate-700 bg-slate-950 px-4 py-2 text-slate-100"><option value="">Chapter (optional)</option>{chapters.map(c=> <option key={c.id} value={c.id}>{c.title}</option>)}</select>
+              <input type="file" accept="application/pdf,image/*" onChange={e=>setImportFile(e.target.files && e.target.files[0] ? e.target.files[0] : null)} className="rounded-2xl border border-slate-700 bg-slate-950 px-4 py-2 text-slate-100" />
+            </div>
+            <div className="flex gap-3">
+              <button type="submit" disabled={importLoading} className="flex-1 rounded-2xl bg-emerald-500 px-4 py-2 text-slate-950 font-semibold transition hover:bg-emerald-400">{importLoading?'Importing...':'Import'}</button>
+              <button type="button" onClick={()=>setImportShow(false)} className="flex-1 rounded-2xl border border-slate-700 px-4 py-2 text-slate-100 transition hover:bg-slate-800">Cancel</button>
             </div>
           </form>
         )}

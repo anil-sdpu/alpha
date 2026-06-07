@@ -3,14 +3,22 @@ import { useAuth } from '../AuthContext';
 
 function TestsPage({ token }){
   const [items,setItems]=useState([]);
+  const [papers,setPapers]=useState([]);
   const [classes,setClasses]=useState([]);
   const [subjects,setSubjects]=useState([]);
   const [loading,setLoading]=useState(false);
   const [error,setError]=useState('');
   const [formData,setFormData]=useState({class_id:'',subject_id:'',chapter_id:'',test_type:'weekly',title:'',date:'',start_time:'',end_time:'',total_marks:100,duration_minutes:60});
   const [editingId,setEditingId]=useState(null); const [show,setShow]=useState(false);
+  const [uploadShow, setUploadShow] = useState(false);
+  const [uploadTestId, setUploadTestId] = useState(null);
+  const [uploadTitle, setUploadTitle] = useState('');
+  const [uploadFile, setUploadFile] = useState(null);
+  const [uploadError, setUploadError] = useState('');
+  const [uploadLoading, setUploadLoading] = useState(false);
 
   useEffect(()=>{load(); loadMeta();},[]);
+  useEffect(()=>{ loadPapers(); },[]);
   const { hasPermission } = useAuth();
 
   if (!hasPermission('tests','view')) {
@@ -18,6 +26,8 @@ function TestsPage({ token }){
   }
 
   async function load(){ setLoading(true); setError(''); try{ const res=await fetch('/api/tests',{headers:{Authorization:`Bearer ${token}`}}); if(!res.ok) throw new Error('Failed to load tests'); const j=await res.json(); setItems(j.data||[]); }catch(e){ setError(e.message);} finally{ setLoading(false);} }
+
+  async function loadPapers(){ try{ const res = await fetch('/api/question_papers',{headers:{Authorization:`Bearer ${token}`}}); if(!res.ok) return; const j = await res.json(); setPapers(j.data || []); }catch(e){} }
 
   async function loadMeta(){ try{ const r1=await fetch('/api/classes',{headers:{Authorization:`Bearer ${token}`}}); if(r1.ok){ setClasses((await r1.json()).data||[]);} const r2=await fetch('/api/subjects',{headers:{Authorization:`Bearer ${token}`}}); if(r2.ok){ setSubjects((await r2.json()).data||[]);} }catch(e){} }
 
@@ -27,6 +37,30 @@ function TestsPage({ token }){
 
   function handleEdit(it){ setEditingId(it.id); setFormData(it); setShow(true); }
   async function handleDelete(id){ if(!confirm('Delete test?')) return; setError(''); try{ const r=await fetch(`/api/tests/${id}`,{method:'DELETE',headers:{Authorization:`Bearer ${token}`}}); if(!r.ok) throw new Error('Failed to delete test'); load(); }catch(e){ setError(e.message);} }
+
+  function openUpload(testId){ setUploadTestId(testId); setUploadTitle(''); setUploadFile(null); setUploadError(''); setUploadShow(true); }
+
+  function handleFileSelect(e){ setUploadFile(e.target.files && e.target.files[0] ? e.target.files[0] : null); }
+
+  async function handleUploadSubmit(e){ e.preventDefault(); if(!uploadTestId) return setUploadError('No test selected'); if(!uploadFile) return setUploadError('Select a PDF to upload'); setUploadLoading(true); setUploadError(''); try{ const fd = new FormData(); fd.append('file', uploadFile); fd.append('test_id', uploadTestId); fd.append('title', uploadTitle || 'Paper'); const r = await fetch('/api/upload/question_paper',{method:'POST',headers:{Authorization:`Bearer ${token}`},body:fd}); if(!r.ok){ const j = await r.json().catch(()=>null); throw new Error((j && j.error) ? j.error : 'Upload failed'); } setUploadShow(false); load(); }catch(e){ setUploadError(e.message);} finally{ setUploadLoading(false); } }
+
+  async function handleUploadSubmit(e){
+    e.preventDefault();
+    if(!uploadTestId) return setUploadError('No test selected');
+    if(!uploadFile) return setUploadError('Select a PDF to upload');
+    setUploadLoading(true); setUploadError('');
+    try{
+      const fd = new FormData();
+      fd.append('file', uploadFile);
+      fd.append('test_id', uploadTestId);
+      fd.append('title', uploadTitle || 'Paper');
+      const r = await fetch('/api/upload/question_paper',{method:'POST',headers:{Authorization:`Bearer ${token}`},body:fd});
+      if(!r.ok){ const j = await r.json().catch(()=>null); throw new Error((j && j.error) ? j.error : 'Upload failed'); }
+      setUploadShow(false);
+      await load();
+      await loadPapers();
+    }catch(e){ setUploadError(e.message);} finally{ setUploadLoading(false); }
+  }
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 p-6">
@@ -62,6 +96,22 @@ function TestsPage({ token }){
           </form>
         )}
 
+        {uploadShow && (
+          <form onSubmit={handleUploadSubmit} className="mb-8 space-y-4 rounded-3xl border border-slate-800 bg-slate-900 p-6">
+            <h2 className="text-xl font-semibold">Upload Question Paper</h2>
+            <p className="text-sm text-slate-400">Uploading for test ID: {uploadTestId}</p>
+            {uploadError && <div className="rounded-2xl bg-red-500/10 px-4 py-3 text-sm text-red-200">{uploadError}</div>}
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <input type="text" placeholder="Paper Title" value={uploadTitle} onChange={e=>setUploadTitle(e.target.value)} className="rounded-2xl border border-slate-700 bg-slate-950 px-4 py-2 text-slate-100" />
+              <input type="file" accept="application/pdf" onChange={handleFileSelect} className="rounded-2xl border border-slate-700 bg-slate-950 px-4 py-2 text-slate-100" />
+            </div>
+            <div className="flex gap-3">
+              <button type="submit" disabled={uploadLoading} className="flex-1 rounded-2xl bg-emerald-500 px-4 py-2 text-slate-950 font-semibold transition hover:bg-emerald-400">{uploadLoading?'Uploading...':'Upload'}</button>
+              <button type="button" onClick={()=>setUploadShow(false)} className="flex-1 rounded-2xl border border-slate-700 px-4 py-2 text-slate-100 transition hover:bg-slate-800">Cancel</button>
+            </div>
+          </form>
+        )}
+
         {loading ? (
           <p className="text-slate-400">Loading tests…</p>
         ) : (
@@ -75,8 +125,9 @@ function TestsPage({ token }){
                     <th className="px-6 py-3 text-left font-semibold">Title</th>
                     <th className="px-6 py-3 text-left font-semibold">Class</th>
                     <th className="px-6 py-3 text-left font-semibold">Subject</th>
+                    <th className="px-6 py-3 text-left font-semibold">Papers</th>
                     <th className="px-6 py-3 text-left font-semibold">Date</th>
-                    {(hasPermission('tests','edit') || hasPermission('tests','delete')) && (
+                    {(hasPermission('tests','edit') || hasPermission('tests','delete') || hasPermission('tests','create')) && (
                       <th className="px-6 py-3 text-left font-semibold">Actions</th>
                     )}
                   </tr>
@@ -87,10 +138,22 @@ function TestsPage({ token }){
                       <td className="px-6 py-3 font-medium">{it.title}</td>
                       <td className="px-6 py-3">{it.class_name}</td>
                       <td className="px-6 py-3">{it.subject_name}</td>
+                      <td className="px-6 py-3">
+                        {papers.filter(p=>p.test_id===it.id).length===0 ? (
+                          <span className="text-slate-500">—</span>
+                        ) : (
+                          papers.filter(p=>p.test_id===it.id).map(p => (
+                            <div key={p.id} className="mb-1">
+                              <a href={`/${p.pdf_path || p.pdf_path}`} target="_blank" rel="noreferrer" className="text-cyan-400 hover:underline">{p.title || 'Paper'}</a>
+                            </div>
+                          ))
+                        )}
+                      </td>
                       <td className="px-6 py-3">{it.date}</td>
-                      {(hasPermission('tests','edit') || hasPermission('tests','delete')) && (
+                      {(hasPermission('tests','edit') || hasPermission('tests','delete') || hasPermission('tests','create')) && (
                         <td className="px-6 py-3">
                           {hasPermission('tests','edit') && <button onClick={()=>handleEdit(it)} className="mr-2 rounded-lg bg-blue-600 px-3 py-1 text-xs text-white hover:bg-blue-500">Edit</button>}
+                          {hasPermission('tests','create') && <button onClick={()=>openUpload(it.id)} className="mr-2 rounded-lg bg-emerald-600 px-3 py-1 text-xs text-white hover:bg-emerald-500">Upload Paper</button>}
                           {hasPermission('tests','delete') && <button onClick={()=>handleDelete(it.id)} className="rounded-lg bg-red-600 px-3 py-1 text-xs text-white hover:bg-red-500">Delete</button>}
                         </td>
                       )}
