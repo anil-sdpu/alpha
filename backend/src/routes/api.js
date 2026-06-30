@@ -277,6 +277,23 @@ router.get('/debug/chapters-map', async (req, res) => {
   }
 });
 
+// Debug: check if an uploaded practice file exists on disk
+// Usage: /api/debug/check-upload?file=1780814073402-RS_AGGARWAL.pdf
+router.get('/debug/check-upload', async (req, res) => {
+  try {
+    const filename = req.query.file || '';
+    if (!filename) return res.status(400).json({ error: 'file query parameter required' });
+    const filePath = path.join(__dirname, '..', '..', 'uploads', 'practice', filename);
+    const exists = fs.existsSync(filePath);
+    if (!exists) return res.status(404).json({ exists: false, path: filePath });
+    const stat = fs.statSync(filePath);
+    return res.json({ exists: true, path: filePath, size: stat.size, mtime: stat.mtime });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Unable to check file' });
+  }
+});
+
 router.post('/chapters', authenticate, requirePermission('chapters','create'), async (req, res) => {
   const { subject_id, chapter_number, title, notes_path, status, class_id } = req.body;
   if (!subject_id || !title) return res.status(400).json({ error: 'subject_id and title required' });
@@ -457,6 +474,20 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
+// practice uploads storage (pdf / images) - saved under uploads/practice
+const practiceStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const dest = path.join(uploadsRoot, 'practice');
+    fs.mkdirSync(dest, { recursive: true });
+    cb(null, dest);
+  },
+  filename: function (req, file, cb) {
+    const name = Date.now() + '-' + file.originalname.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+    cb(null, name);
+  }
+});
+const practiceUpload = multer({ storage: practiceStorage });
+
 // Upload PDF for question paper and optionally create record
 router.post('/upload/question_paper', authenticate, requirePermission('tests','create'), upload.single('file'), async (req, res) => {
   try {
@@ -565,6 +596,50 @@ router.post('/upload/questions', authenticate, requirePermission('questions','cr
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Unable to import questions' });
+  }
+});
+
+// Practice uploads: save PDF or image and record metadata (no parsing)
+router.post('/practice/uploads', authenticate, requirePermission('questions','create'), practiceUpload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+    const relPath = path.join('uploads', 'practice', req.file.filename).replace(/\\/g, '/');
+    const [r] = await pool.query('INSERT INTO practice_uploads (original_name, file_path, mime_type, uploaded_by) VALUES (?, ?, ?, ?)', [req.file.originalname, relPath, req.file.mimetype || null, req.user ? req.user.id : null]);
+    res.json({ id: r.insertId, path: relPath });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Unable to save practice upload' });
+  }
+});
+
+router.get('/practice/uploads', authenticate, requirePermission('questions','view'), async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT pu.*, u.full_name as uploaded_by_name FROM practice_uploads pu LEFT JOIN users u ON pu.uploaded_by = u.id ORDER BY pu.created_at DESC LIMIT 1000');
+    // attach public_url for each row so frontend doesn't need to compute it
+    const backendBase = process.env.BACKEND_URL || 'http://localhost:4000';
+    const data = rows.map(r => ({
+      ...r,
+      public_url: r.file_path ? `${backendBase.replace(/\/$/, '')}/${r.file_path.replace(/^\//, '')}` : null
+    }));
+    res.json({ data });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Unable to fetch practice uploads' });
+  }
+});
+
+router.delete('/practice/uploads/:id', authenticate, requirePermission('questions','delete'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const [rows] = await pool.query('SELECT * FROM practice_uploads WHERE id = ? LIMIT 1', [id]);
+    if (!rows[0]) return res.status(404).json({ error: 'Not found' });
+    const filePath = path.join(__dirname, '..', '..', rows[0].file_path || '');
+    try { if (fs.existsSync(filePath)) fs.unlinkSync(filePath); } catch (e) {}
+    await pool.query('DELETE FROM practice_uploads WHERE id = ?', [id]);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Unable to delete upload' });
   }
 });
 

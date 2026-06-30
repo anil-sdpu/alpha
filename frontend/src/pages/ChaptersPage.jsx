@@ -138,7 +138,7 @@ function ChaptersPage({ token }) {
                 {subjects.map(s => <option key={s.id} value={s.id}>{s.subject_name}</option>)}
               </select>
               <input type="text" placeholder="Chapter Number" value={formData.chapter_number} onChange={e => setFormData({ ...formData, chapter_number: e.target.value })} className="rounded-2xl border border-slate-700 bg-slate-950 px-4 py-2 text-slate-100" />
-              <input type="text" placeholder="Title" value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} className="rounded-2xl border border-slate-700 bg-slate-950 px-4 py-2 text-slate-100 md:col-span-2" required />
+              <input type="text" placeholder="Chapter Name" value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} className="rounded-2xl border border-slate-700 bg-slate-950 px-4 py-2 text-slate-100 md:col-span-2" required />
               <input type="text" placeholder="Notes Path" value={formData.notes_path} onChange={e => setFormData({ ...formData, notes_path: e.target.value })} className="rounded-2xl border border-slate-700 bg-slate-950 px-4 py-2 text-slate-100 md:col-span-2" />
             </div>
             <div className="flex gap-3">

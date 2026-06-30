@@ -142,11 +142,17 @@ function TestsPage({ token }){
                         {papers.filter(p=>p.test_id===it.id).length===0 ? (
                           <span className="text-slate-500">—</span>
                         ) : (
-                          papers.filter(p=>p.test_id===it.id).map(p => (
-                            <div key={p.id} className="mb-1">
-                              <a href={`/${p.pdf_path || p.pdf_path}`} target="_blank" rel="noreferrer" className="text-cyan-400 hover:underline">{p.title || 'Paper'}</a>
-                            </div>
-                          ))
+                          papers.filter(p=>p.test_id===it.id).map(p => {
+                            const raw = p.pdf_path || p.path || '';
+                            const url = raw ? (raw.startsWith('/') ? raw : `/${raw.replace(/\\/g, '/')}`) : null;
+                            return (
+                              <div key={p.id} className="mb-1 flex items-center gap-3">
+                                <a href={url || '#'} target="_blank" rel="noreferrer" className="text-cyan-400 hover:underline">{p.title || 'Paper'}</a>
+                                {url && <button onClick={() => window.open(url, '_blank')} className="rounded-lg bg-slate-800 px-2 py-0.5 text-xs text-white hover:bg-slate-700">View</button>}
+                                {url && <a href={url} download className="rounded-lg bg-slate-800 px-2 py-0.5 text-xs text-white hover:bg-slate-700">Download</a>}
+                              </div>
+                            );
+                          })
                         )}
                       </td>
                       <td className="px-6 py-3">{it.date}</td>
